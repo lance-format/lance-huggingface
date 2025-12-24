@@ -3,13 +3,13 @@
 import argparse
 import os
 import shutil
+from pathlib import Path
 
 import datasets
 import lance
-from pathlib import Path
 
 
-def size_catagory(num_rows: int) -> str:
+def size_categories(num_rows: int) -> str:
     # TODO: should move this to a common util file
     match num_rows:
         case n if n < 1_000:
@@ -46,7 +46,10 @@ def generate_hf_dataset(
             output_base_path / "data" / f"{split}.lance",
         )
 
-    total_rows =  sum(len(hf_dataset_dict[split]) for split in hf_dataset_dict)
+    output_dataset_name = os.path.split(output_base_path)[1]
+    lance_hf_dataset_name = f"lance-format/{output_dataset_name}"
+
+    total_rows = sum(len(hf_dataset_dict[split]) for split in hf_dataset_dict)
     with open(output_base_path / "README.md", "w") as f:
         f.write(
             f"""---
@@ -55,12 +58,30 @@ tags:
 - lance
 pretty_name: LeRobot Dataset
 size_categories:
- - {size_catagory(total_rows)}
+- {size_catagory(total_rows)}
 source_datasets:
- - {dataset_name}
+- {dataset_name}
+configs:
+- config_name: default
+  dataset_dirs:
+  - split: train
+    path:
+    - "data/train.lance"
 ---
 # LeRobot dataset converted from Hugging Face\n\n
-Original dataset: `{dataset_name}`\n"
+Original dataset: `{dataset_name}`
+
+## How to use the dataset
+
+```shell
+pip install pylance datasets
+```
+
+```python
+import datasets
+
+ds = datasets.load_dataset("{lance_hf_dataset_name}")
+```
 """
         )
 
