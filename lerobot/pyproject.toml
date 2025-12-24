@@ -1,0 +1,10 @@
+[project]
+name = "lerobot"
+version = "0.1.0"
+description = "LeRobot in Lance format"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["pyarrow", "datasets", "pylance", "huggingface_hub"]
+
+[dependency-groups]
+dev = ["ruff"]
