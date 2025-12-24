@@ -58,15 +58,9 @@ tags:
 - lance
 pretty_name: LeRobot Dataset
 size_categories:
-- {size_catagory(total_rows)}
+- {size_categories(total_rows)}
 source_datasets:
 - {dataset_name}
-configs:
-- config_name: default
-  dataset_dirs:
-  - split: train
-    path:
-    - "data/train.lance"
 ---
 # LeRobot dataset converted from Hugging Face\n\n
 Original dataset: `{dataset_name}`
