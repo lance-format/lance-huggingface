@@ -1,0 +1,11 @@
+[project]
+name = "fineweb"
+version = "0.1.0"
+description = "Convert FineWeb dataset into lance"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["pylance", "datasets", "huggingface_hub", "numpy", "tqdm"]
+
+
+[dependency-groups]
+dev = ["ruff"]
