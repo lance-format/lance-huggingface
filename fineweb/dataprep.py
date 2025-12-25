@@ -36,6 +36,7 @@ def cohere_fineweb(args):
         data_gen(),
         "fineweb-edu-cohere/data/train.lance",
         schema=schema,
+        data_storage_version="2.1",
         max_bytes_per_file=15_000_000_000,
     )
 
