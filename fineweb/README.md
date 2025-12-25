@@ -7,10 +7,11 @@
 
 ## Prepare datasets
 
-```
+```sh
+export HF_TOKEN=hf_....
 mkdir data && cd data
-git clone --depth 1 https://huggingface.co/datasets/Cohere/fineweb-edu-emb
-git clone --depth 1 https://huggingface.co/datasets/Cohere/fineweb-edu-corpus
+uvx hf download --repo-type dataset Cohere/fineweb-edu-emb --local-dir fineweb-edu-emb
+uvx hf download --repo-type dataset Cohere/fineweb-edu-corpus --local-dir fineweb-edu-corpus
 ```
 
 ```py
