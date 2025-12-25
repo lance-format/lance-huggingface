@@ -20,13 +20,14 @@ def cohere_fineweb(args):
             corpus_path = Path(
                 "./data/fineweb-edu-corpus/corpus", f"{stem}.parquet.jsonl.zst"
             )
-            tbl = pa_json.read_json(corpus_path).combine_chunks()
+            tbl = pa_json.read_json(corpus_path)
+            print(tbl.num_rows)
             embeddings = np.load(npfile).astype(np.float32)
             assert tbl.num_rows == embeddings.shape[0]
             dim = embeddings.shape[1]
 
             emb_arr = pa.FixedSizeListArray.from_arrays(embeddings.reshape(-1), dim)
-            tbl = tbl.append_column("embedding", emb_arr)
+            tbl = tbl.append_column("cohere_emb", emb_arr)
             yield from tbl.to_batches()
 
     schema = next(data_gen()).schema
@@ -39,6 +40,7 @@ def cohere_fineweb(args):
         data_storage_version="2.1",
         max_bytes_per_file=15_000_000_000,
     )
+    shutil.copy("./README.cohere_emb.md", "fineweb-edu-cohere/README.md")
 
 
 def main():
