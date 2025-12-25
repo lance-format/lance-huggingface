@@ -21,7 +21,6 @@ def cohere_fineweb(args):
                 "./data/fineweb-edu-corpus/corpus", f"{stem}.parquet.jsonl.zst"
             )
             tbl = pa_json.read_json(corpus_path)
-            print(tbl.num_rows)
             embeddings = np.load(npfile).astype(np.float32)
             assert tbl.num_rows == embeddings.shape[0]
             dim = embeddings.shape[1]
@@ -31,7 +30,7 @@ def cohere_fineweb(args):
             yield from tbl.to_batches()
 
     schema = next(data_gen()).schema
-    shutil.rmtree("fineweb-edu-cohere.lance", ignore_errors=True)
+    shutil.rmtree("fineweb-edu-cohere", ignore_errors=True)
 
     lance.write_dataset(
         data_gen(),
