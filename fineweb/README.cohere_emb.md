@@ -11,7 +11,7 @@ language:
   - en
 pretty_name: Fineweb-Edu Cohere Embeddings
 size_categories:
-- 1B<n<10B
+- 100M<n<1B
 source_datasets:
 - Cohere/fineweb-edu-emb
 - Cohere/fineweb-edu-corpus
