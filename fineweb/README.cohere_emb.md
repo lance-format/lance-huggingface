@@ -28,13 +28,14 @@ It works with huggingface `datasets` package
 
 ```py
 import datasets
-ds = datasets.load_dataset("lance-format/fineweb-edu-cohere")
+ds = datasets.load_dataset("lance-format/fineweb-edu-cohere-emb")
 ```
 
 To take full advantages of Lance format, you can also download the dataset via `git`
 
 ```sh
-git clone https://huggingface.co/datasets/lance-format/fineweb-edu-cohere
+export HF_TOKEN=hf_....
+uvx hf download --repo-type dataset lance-format/fineweb-edu-cohere-emb --local-dir fineweb-edu
 ```
 
 Run in `python`
@@ -42,6 +43,6 @@ Run in `python`
 ```py
 import lance
 
-ds = lance.dataset("fineweb-edu-cohere")
+ds = lance.dataset("./fineweb-edu/data/train.lance")
 print(ds.count_rows())
 ```
