@@ -8,7 +8,6 @@
 ## Prepare datasets
 
 ```sh
-export HF_TOKEN=hf_....
 mkdir data && cd data
 uvx hf download --repo-type dataset Cohere/fineweb-edu-emb --local-dir fineweb-edu-emb
 uvx hf download --repo-type dataset Cohere/fineweb-edu-corpus --local-dir fineweb-edu-corpus

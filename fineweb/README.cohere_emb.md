@@ -31,7 +31,17 @@ import datasets
 ds = datasets.load_dataset("lance-format/fineweb-edu-cohere-emb")
 ```
 
-To take full advantages of Lance format, you can also download the dataset via `git`
+Lance format supports directly read `hf` datasets
+
+```py
+import lance
+
+uri = "hf://datasets/lance-format/fineweb-edu-cohere-emb/data/train.lance"
+dataset = lance.dataset(uri)
+print(dataset.count_rows())
+```
+
+To take full advantages of Lance format, you can also download the dataset via `hf` cli or `git`
 
 ```sh
 export HF_TOKEN=hf_....
