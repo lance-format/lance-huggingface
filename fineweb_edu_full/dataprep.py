@@ -12,6 +12,7 @@ from typing import Iterable, Iterator, List, Dict, Optional, Any
 from huggingface_hub import HfApi, get_token
 
 # "default" corresponds to the full dataset (~1.5T tokens / ~1.5B rows)
+DATASET_NAME = "HuggingFaceFW/fineweb-edu"
 DEFAULT_CONFIG = "default"
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
