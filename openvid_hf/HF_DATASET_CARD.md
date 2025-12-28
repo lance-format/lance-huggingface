@@ -75,7 +75,6 @@ print(f"Total videos: {ds.count_rows():,}")
 > 
 > When streaming from HuggingFace (as shown above), some operations use minimal parameters to avoid rate limits:
 > - `nprobes=1` for vector search (lowest value)
-> - `fast_search=True` for FTS to skip unindexed data
 > - Column selection to reduce I/O
 > 
 > **You may still hit rate limits on HuggingFace's free tier.** For best performance and to avoid rate limits, **download the dataset locally**:
