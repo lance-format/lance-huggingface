@@ -1,6 +1,22 @@
+---
+license: cc-by-4.0
+task_categories:
+- text-to-video
+- video-classification
+language:
+- en
+tags:
+- text-to-video
+- video-search
+pretty_name: openvid-lance
+size_categories:
+- 100K<n<1M
+---
 # OpenVid Dataset (Lance Format)
 
 Lance format version of the [OpenVid dataset](https://huggingface.co/datasets/nkp37/OpenVid-1M) with **937,957 high-quality videos** stored with inline video blobs, embeddings, and rich metadata.
+
+![](https://huggingface.co/datasets/nkp37/OpenVid-1M/resolve/main/OpenVid-1M.png)
 
 **Key Features:**
 The dataset is stored in lance format with inline video blobs, video embeddings, and rich metadata.
@@ -174,14 +190,13 @@ high_quality = ds.scanner(
 
 ## Citation
 
-If you use this dataset, please cite the OpenVid project:
-
-```bibtex
-@misc{openvid2024,
-  title={OpenVid: Large-Scale Video Dataset},
+@article{nan2024openvid,
+  title={OpenVid-1M: A Large-Scale High-Quality Dataset for Text-to-video Generation},
+  author={Nan, Kepan and Xie, Rui and Zhou, Penghao and Fan, Tiehan and Yang, Zhenheng and Chen, Zhijie and Li, Xiang and Yang, Jian and Tai, Ying},
+  journal={arXiv preprint arXiv:2407.02371},
   year={2024}
 }
-```
+
 
 ## License
 
