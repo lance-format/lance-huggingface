@@ -1,0 +1,17 @@
+[project]
+name = "openvid-hf"
+version = "0.1.0"
+description = "OpenVid dataset with video blobs in Lance format for Hugging Face Hub"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pylance",
+    "lancedb",
+    "pyarrow",
+    "pandas",
+    "boto3",
+    "huggingface_hub",
+]
+
+[dependency-groups]
+dev = ["ruff"]
