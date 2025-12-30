@@ -5,6 +5,7 @@ description = "OpenVid dataset with video blobs in Lance format for Hugging Face
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "av",
     "pylance",
     "lancedb",
     "pyarrow",
