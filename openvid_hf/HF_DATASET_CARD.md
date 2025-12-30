@@ -130,7 +130,36 @@ for i, blob_file in enumerate(blob_files):
         f.write(blob_file.read())
 ```
 
-### 3. Vector Similarity Search
+### 3. Open inline videos with PyAV and run seeks directly on the blob file
+
+```python
+import av
+
+selected_index = 123
+blob_file = ds.take_blobs("video_blob", ids=[selected_index])[0]
+
+with av.open(blob_file) as container:
+    stream = container.streams.video[0]
+
+    for seconds in (0.0, 1.0, 2.5):
+        target_pts = int(seconds / stream.time_base)
+        container.seek(target_pts, stream=stream)
+
+        frame = None
+        for candidate in container.decode(stream):
+            if candidate.time is None:
+                continue
+            frame = candidate
+            if frame.time >= seconds:
+                break
+
+        print(
+            f"Seek {seconds:.1f}s -> {frame.width}x{frame.height} "
+            f"(pts={frame.pts}, time={frame.time:.2f}s)"
+        )
+```
+
+### 4. Vector Similarity Search
 
 ```python
 import pyarrow as pa
@@ -153,7 +182,7 @@ for video in results[1:]:  # Skip first (query itself)
     print(video['caption'])
 ```
 
-### 4. Full-Text Search
+### 5. Full-Text Search
 
 ```python
 # Search captions using FTS index
@@ -168,7 +197,7 @@ for video in results:
     print(f"{video['caption']} - {video['aesthetic_score']:.2f}")
 ```
 
-### 5. Filter by Quality
+### 6. Filter by Quality
 
 ```python
 # Get high-quality videos
