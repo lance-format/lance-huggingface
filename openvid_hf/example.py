@@ -8,9 +8,11 @@ Load from HuggingFace and demonstrate:
 3. Full-text search on captions
 """
 
+from pathlib import Path
+
+import av
 import lance
 import pyarrow as pa
-from pathlib import Path
 
 
 # ============================================================================
@@ -74,6 +76,36 @@ def export_batch_videos(ds, output_dir="./videos", limit=5, offset=0):
         filename = f"{offset + i:06d}.mp4"
         output_path = Path(output_dir) / filename
         save_video_blob(blob_bytes, str(output_path))
+
+
+def inspect_video_with_pyav(ds, video_index=0):
+    """Seek within a blob and print the first frame past each timestamp."""
+    print(f"\nInspecting video index {video_index} with PyAV")
+    blob_file = ds.take_blobs("video_blob", ids=[video_index])[0]
+
+    with av.open(blob_file) as container:
+        stream = container.streams.video[0]
+
+        for seconds in (0.0, 1.0, 2.5):
+            target_pts = int(seconds / stream.time_base)
+            container.seek(target_pts, stream=stream)
+
+            frame = None
+            for candidate in container.decode(stream):
+                if candidate.time is None:
+                    continue
+                frame = candidate
+                if frame.time >= seconds:
+                    break
+
+            if frame is None:
+                print(f"  Seek {seconds:.1f}s -> no frame decoded")
+                continue
+
+            print(
+                f"  Seek {seconds:.1f}s -> {frame.width}x{frame.height} "
+                f"(pts={frame.pts}, time={frame.time:.2f}s)"
+            )
 
 
 # ============================================================================
@@ -158,4 +190,8 @@ if __name__ == "__main__":
     print("="*70)
     print("EXAMPLE 3: Full-Text Search (Lance Native FTS)")
     results = search_captions(ds, "sunset", limit=2)
+
+    print("="*70)
+    print("EXAMPLE 4: PyAV Decode & Seeks")
+    inspect_video_with_pyav(ds, video_index=3500)
     
