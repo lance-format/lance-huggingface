@@ -9,7 +9,11 @@ directly in a raw Lance dataset, or adopt a Hugging Face–style directory struc
 placing Lance datasets for different splits in the `/data` directory:
 
 ```sh
-/data/{train,eval}.lance
-/README.md
+my_dataset/
+├── README.md
+└── data/
+    ├── train.lance
+    ├── test.lance
+    └── validation.lance
 ```
 
