@@ -17,7 +17,7 @@ size_categories:
 ---
 # LAION-Subset (Lance Format)
 
-A Lance-hosted slice of the LAION image-text corpus (~1M rows) with inline JPEG bytes, CLIP embeddings (`img_emb`), and full metadata available directly from the Hub: `hf://datasets/lance-format/laion-subset`.
+A lance dataset of LAION image-text corpus (~1M rows) with inline JPEG bytes, CLIP embeddings (`img_emb`), and full metadata available directly from the Hub: `hf://datasets/lance-format/laion-subset`.
 
 
 ## Key Features
@@ -25,7 +25,7 @@ A Lance-hosted slice of the LAION image-text corpus (~1M rows) with inline JPEG 
 - **Images stored inline** – the `image` column is binary data, so sampling/exporting images never leaves Lance.
 - **Prebuilt ANN index** – `img_emb` ships with IVF_PQ for instant similarity search.
 - **Metadata rich** – captions, URLs, NSFW flags, EXIF, dimensions, similarity scores, etc.
-- **Hub ↔ Lance bridge** – stream metadata via `datasets` or connect with Lance for all features.
+- **Lance<>HF integration** – access via `datasets` or connect with Lance for ANN search, image export, and any operation that needs the vector index or binary blobs.
 
 ## Load with `datasets.load_dataset`
 
@@ -113,7 +113,6 @@ Core fields:
 - `exif`, `md5`
 - `img_emb`
 
-Column names are case sensitive (use `"NSFW"`, `"LICENSE"`, etc. in filters).
 
 ## Usage Examples
 
@@ -154,7 +153,7 @@ neighbors = ds.scanner(
 
 ## Dataset Evolution
 
-Want to add new annotations (COCO tags, moderation flags, new embeddings) without rewriting everything? Lance supports transactional schema evolution ([docs](https://lance.org/guide/data_evolution/?h=evol)).
+Want to add new annotations (COCO tags, moderation flags, new embeddings) without rewriting everything? Lance supports transactional schema evolution ([docs](https://lance.org/guide/data_evolution/)).
 
 ```python
 import lance
