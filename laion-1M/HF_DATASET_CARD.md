@@ -59,7 +59,8 @@ print(ds.count_rows())
 
 ## Why Lance?
 
-- Images + embeddings + metadata travel as one dataset.
+- Optimized for AI workloads: Lance keeps multimodal data and vector search-ready storage in the same columnar format designed for accelerator-era retrieval (see [lance.org](https://lance.org)).
+- Images + embeddings + metadata travel as one tabular dataset.
 - On-disk ANN index means `nearest={...}` just works—no FAISS build step.
 - Columnar format keeps metadata scans fast despite millions of rows.
 - Schema evolution lets you add new annotations (moderation tags, embeddings, etc.) without rewriting the raw data.
