@@ -51,7 +51,6 @@ blob_file = lance_ds.take_blobs("video_blob", ids=[0])[0]
 video_bytes = blob_file.read()
 ```
 
-This pairing lets you explore metadata cheaply with Hugging Face streaming while running blob downloads, vector search, or full-text search through Lance.
 
 ## Why Lance?
 
