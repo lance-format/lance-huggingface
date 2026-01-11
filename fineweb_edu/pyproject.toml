@@ -1,0 +1,20 @@
+[project]
+name = "fineweb-edu-geneva"
+version = "0.1.0"
+description = "Ingestion of Fineweb-Edu to LanceDB with large scale embedding backfill using geneva"
+dependencies = [
+    "lance",
+    "lancedb",
+    "datasets",
+    "pandas",
+    "torch",
+    "sentence-transformers>=3.0.0",
+    "huggingface_hub",
+    "requests",
+    "geneva",
+    "kubernetes",
+    "ray[default]"
+]
+
+[tool.uv]
+dev-dependencies = ["pylance", "black"]
