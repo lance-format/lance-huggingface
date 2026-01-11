@@ -39,14 +39,6 @@ def call_endpoint(url: str, payload: dict, token: str, timeout: int = 60) -> Lis
     return []
 
 
-def enforce_fragment_size_limit(table, max_fragment_gb: float) -> None:
-    if not max_fragment_gb or max_fragment_gb <= 0:
-        return
-    max_bytes = int(max_fragment_gb * (1024**3))
-    logging.info("Compacting fragments to stay under ~%.2f GB", max_fragment_gb)
-    dataset = table.to_lance()
-    dataset.optimize.compact_files(max_bytes_per_file=max_bytes)
-
 
 def add_text_embeddings(
     table,
@@ -133,7 +125,6 @@ def main() -> None:
         args.embedding_concurrency,
     )
 
-    #enforce_fragment_size_limit(table, args.max_fragment_gb)
     logging.info("Finished text embedding backfill")
 
 
