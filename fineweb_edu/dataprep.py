@@ -17,17 +17,12 @@ def log(msg: str):
 
 
 def make_reader(data_iterator: Iterator[pa.Table], limit: Optional[int]) -> Iterator[pa.RecordBatch]:
-    """
-    Converts the HuggingFace Table iterator into a RecordBatch iterator
-    which LanceDB consumes with zero-copy.
-    """
     total_yielded = 0
     for table in data_iterator:
         for batch in table.to_batches():
             if limit and total_yielded >= limit:
                 return
             
-            # Trim the last batch if it exceeds the limit
             if limit and (total_yielded + len(batch)) > limit:
                 batch = batch.slice(0, limit - total_yielded)
                 yield batch
