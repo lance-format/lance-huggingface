@@ -60,7 +60,7 @@ print(f"Total passages: {ds.count_rows():,}")
 - Images + embeddings + metadata travel as one tabular dataset.
 - On-disk ANN index means `nearest={...}` just works—no FAISS build step.
 - Columnar format keeps metadata scans fast despite millions of rows.
-- Schema evolution lets you add new annotations (moderation tags, embeddings, etc.) without rewriting the raw data.
+- Schema evolution lets you add new features/columns (moderation tags, embeddings, etc.) without rewriting the raw data.
 
 
 ## Quick Start (Lance Python)
