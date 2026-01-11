@@ -53,12 +53,15 @@ print(f"Total passages: {ds.count_rows():,}")
 > - Pre-built ANN/FTS indexes aren't uploaded yet— It is recommended todownload the dataset locally and build indexes yourself before running similarity/search demos. 
 > - The corpus is large (~1.5B passages). Heavy retrieval workloads should point Lance at a local copy.
 
+
 ## Why Lance?
 
-- Vector + FTS indices live with the dataset, so similarity search is a single API call.
-- Columnar format keeps metadata scans fast even when the corpus spans billions of tokens.
-- Snapshotting & schema evolution make it easy to add new annotations (`text_embedding`, moderation tags, etc.) without rewriting raw text.
-- The `hf://` URI surfaces Hub-hosted data in any Lance runtime (Python, Rust, node, DuckDB).
+- Optimized for AI workloads: Lance keeps multimodal data and vector search-ready storage in the same columnar format designed for accelerator-era retrieval (see [lance.org](https://lance.org)).
+- Images + embeddings + metadata travel as one tabular dataset.
+- On-disk ANN index means `nearest={...}` just works—no FAISS build step.
+- Columnar format keeps metadata scans fast despite millions of rows.
+- Schema evolution lets you add new annotations (moderation tags, embeddings, etc.) without rewriting the raw data.
+
 
 ## Quick Start (Lance Python)
 
@@ -193,5 +196,4 @@ dataset.merge(labels, "id")
 dataset.alter_columns({"path": "subject", "name": "topic"})
 dataset.alter_columns({"path": "text_embedding", "data_type": pa.list_(pa.float16(), 384)})
 ```
-
-These operations are metadata-aware and snapshot-safe, so you can iterate on embeddings, quality tags, or moderation fields while keeping earlier dataset versions available for reproducible experiments.
+You can iterate on embeddings, quality tags, or moderation fields while keeping earlier dataset versions available for reproducible experiments.
