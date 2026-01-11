@@ -57,13 +57,13 @@ print(ds.count_rows())
 > - Streaming is great for sampling metadata but not for ANN queries or bulk image export.
 > - Download the dataset locally (`huggingface-cli download lance-format/laion-subset --repo-type dataset --local-dir ./laion`) for heavy usage, then point Lance at `./laion` to use the IVF_PQ index without Hub rate limits.
 
+
 ## Why Lance?
 
 - Optimized for AI workloads: Lance keeps multimodal data and vector search-ready storage in the same columnar format designed for accelerator-era retrieval (see [lance.org](https://lance.org)).
 - Images + embeddings + metadata travel as one tabular dataset.
-- On-disk ANN index means `nearest={...}` just works—no FAISS build step.
-- Columnar format keeps metadata scans fast despite millions of rows.
-- Schema evolution lets you add new annotations (moderation tags, embeddings, etc.) without rewriting the raw data.
+- On-disk, scalable ANN index
+- Schema evolution lets you add new features/columns (moderation tags, embeddings, etc.) without rewriting the raw data.
 
 ## Quick Start (Lance)
 
