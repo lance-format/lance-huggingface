@@ -26,7 +26,39 @@ The dataset is stored in lance format with inline video blobs, video embeddings,
 - **Efficient column access** - Load metadata without touching video data
 - **Prebuilt indices available** - IVF_PQ index for similarity search, FTS index on captions
 - **Fast random access** - Read any video instantly by index
-- **HuggingFace integration** - Load directly from the Hub in streaming mode
+- **HuggingFace integration** - Load directly from the Hub
+
+## Load lance dataset using `datasets.load_dataset`
+
+```python
+import datasets
+import pyarrow as pa
+
+hf_ds = datasets.load_dataset(
+    "lance-format/openvid-lance",
+    split="train",
+    streaming=True,
+)
+```
+
+You can also load lance datasets from HF hub using native API when you want blob bytes or advanced indexing while still pointing at the same dataset on the Hub:
+
+```python
+import lance
+
+lance_ds = lance.dataset("hf://datasets/lance-format/openvid-lance")
+blob_file = lance_ds.take_blobs("video_blob", ids=[0])[0]
+video_bytes = blob_file.read()
+```
+
+
+## Why Lance?
+
+- Optimized for AI workloads: Lance keeps multimodal data and vector search-ready storage in the same columnar format designed for accelerator-era retrieval (see [lance.org](https://lance.org)).
+- Images + embeddings + metadata travel as one tabular dataset.
+- On-disk, scalable ANN index means
+- Schema evolution lets you add new features/columns (moderation tags, embeddings, etc.) without rewriting the raw data.
+
 
 ## Lance Blob API
 
@@ -89,6 +121,7 @@ print(f"Total videos: {ds.count_rows():,}")
 > ```
 > 
 > Streaming is recommended only for quick exploration and testing.
+
 
 ## Dataset Schema
 
@@ -209,12 +242,52 @@ high_quality = ds.scanner(
 ).to_table().to_pylist()
 ```
 
-## Dataset Statistics
+## Dataset Evolution
 
-- **Total videos**: 937,957
-- **Embedding dimension**: 1024
-- **Video formats**: MP4 (H.264)
-- **Index types**: IVF_PQ (vector),  FTS
+Lance supports transactional schema evolution ([docs](https://lance.org/guide/data_evolution/?h=evol)). You can add/drop columns, backfill with SQL or Python, rename fields, or change data types without rewriting the whole dataset. In practice this lets you:
+- Introduce fresh metadata (moderation labels, embeddings, quality scores) as new signals become available.
+- Add new columns to existing datasets without re-exporting terabytes of video.
+- Adjust column names or shrink storage (e.g., cast embeddings to float16) while keeping previous snapshots queryable for reproducibility.
+
+```python
+import lance
+import pyarrow as pa
+import numpy as np
+
+base = pa.table({"id": pa.array([1, 2, 3])})
+dataset = lance.write_dataset(base, "openvid_evolution", mode="overwrite")
+
+# 1. Grow the schema instantly (metadata-only)
+dataset.add_columns(pa.field("quality_bucket", pa.string()))
+
+# 2. Backfill with SQL expressions or constants
+dataset.add_columns({"status": "'active'"})
+
+# 3. Generate rich columns via Python batch UDFs
+@lance.batch_udf()
+def random_embedding(batch):
+    arr = np.random.rand(batch.num_rows, 128).astype("float32")
+    return pa.RecordBatch.from_arrays(
+        [pa.FixedSizeListArray.from_arrays(arr.ravel(), 128)],
+        names=["embedding"],
+    )
+
+dataset.add_columns(random_embedding)
+
+# 4. Bring in offline annotations with merge
+labels = pa.table({
+    "id": pa.array([1, 2, 3]),
+    "label": pa.array(["horse", "rabbit", "cat"]),
+})
+dataset.merge(labels, "id")
+
+# 5. Rename or cast columns as needs change
+dataset.alter_columns({"path": "quality_bucket", "name": "quality_tier"})
+dataset.alter_columns({"path": "embedding", "data_type": pa.list_(pa.float16(), 128)})
+```
+
+These operations are automatically versioned, so prior experiments can still point to earlier versions while OpenVid keeps evolving.
+
 
 
 ## Citation

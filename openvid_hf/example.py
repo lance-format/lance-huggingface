@@ -12,12 +12,49 @@ from pathlib import Path
 
 import av
 import lance
+import datasets
 import pyarrow as pa
+
+
+def _hf_features_with_struct_blob():
+    """Return HF features with the blob column typed as Lance's struct."""
+    download_config = datasets.DownloadConfig(storage_options={"hf": {}})
+    info = datasets.get_dataset_config_info(
+        "lance-format/openvid-lance",
+        download_config=download_config,
+    )
+    features = info.features.copy()
+    features["video_blob"] = datasets.Features({
+        "position": datasets.Value("uint64"),
+        "size": datasets.Value("uint64"),
+    })
+    return features
 
 
 # ============================================================================
 # 1. Load Lance dataset directly from hf in stream model
 # ============================================================================
+
+def load_using_hf():
+    features = _hf_features_with_struct_blob()
+    ds = datasets.load_dataset(
+        "lance-format/openvid-lance",
+        split="train",
+        streaming=True,
+        features=features,
+    )
+    print(ds)
+
+    return ds
+
+
+def get_hf_stream_batch(ds, batch_size=5):
+    """Consume a batch from the Hugging Face IterableDataset"""
+    rows = list(ds.take(batch_size))
+    table = pa.Table.from_pylist(rows)
+
+    return table
+
 
 def load_dataset():
     ds = lance.dataset("hf://datasets/lance-format/openvid-lance")
@@ -177,6 +214,16 @@ def search_captions(ds, query, limit=5):
 
 
 if __name__ == "__main__":
+    #1. First load the dataset using hf and get a batch then show lance ops
+    print("\nLoading dataset using hf and getting a batch...")
+    hf_ds = load_using_hf()
+    batch = get_hf_stream_batch(hf_ds)
+    print(batch)
+
+    #2. Convert the batch to lance dataset
+    
+    
+    print("loading dataset using lance")
     ds = load_dataset()
     
     print("="*70)
