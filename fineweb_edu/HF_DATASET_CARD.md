@@ -100,7 +100,7 @@ results = lance_ds.scanner(
 
 ## Dataset Schema
 
-Common columns you'll find in this Lance export:
+Common columns you'll find in this Lance dataset:
 - `text` – cleaned passage content.
 - `title` – page/article title when available.
 - `url` – canonical source URL.
@@ -110,7 +110,7 @@ Common columns you'll find in this Lance export:
 
 ## Usage Examples
 
-> **Reference-only search snippets**
+> **Search snippets for reference**
 > The vector/FTS examples below show the Lance APIs you’ll use once indexes are available. The hosted dataset doesn’t yet ship ANN/FTS indexes—download locally (or build indexes yourself) before running them. Pre-built indexes are coming soon.
 
 ### 1. Sample documents without embeddings
