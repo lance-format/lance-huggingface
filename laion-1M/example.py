@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """LAION-Subset Lance Dataset - Simple usage examples."""
 
-from pathlib import Path
 
 import datasets
 import lance
+import pandas as pd
 import pyarrow as pa
 
-try:
-    from PIL import Image  # type: ignore
-except ImportError:  # optional; only used for quick previews
-    Image = None
+from pathlib import Path
+from PIL import Image
 
 
 # =============================================================================
@@ -28,11 +26,11 @@ def load_using_hf():
 
 
 def get_hf_stream_batch(ds, batch_size=5):
-    rows = list(ds.take(batch_size))
-    table = pa.Table.from_pylist(rows)
-    print("\nHF streaming batch:")
-    print(table)
-    return table
+    batch = list(ds.take(batch_size))
+    df = pd.DataFrame.from_records(batch)
+    print("\nHF streaming batch (pandas view):")
+    print(df.head())
+    return df
 
 
 # =============================================================================
@@ -84,12 +82,13 @@ def export_images(ds, ids, output_dir="./laion_images"):
 
 
 def find_similar_images(ds, image_index=0, k=5, nprobes=1, refine_factor=1):
+    emb_field = ds.schema.field("img_emb")
     ref = ds.take([image_index], columns=["img_emb", "caption", "url"]).to_pylist()[0]
-    query = pa.array([ref["img_emb"]], type=ds.schema.field("img_emb").type)
+    query = pa.array([ref["img_emb"]], type=emb_field.type)
 
     results = ds.scanner(
         nearest={
-            "column": "img_emb",
+            "column": emb_field.name,
             "q": query[0],
             "k": k + 1,
             "nprobes": nprobes,
@@ -120,7 +119,7 @@ def filter_quality(ds, min_similarity=0.35, limit=5):
 if __name__ == "__main__":
     print("\nStreaming sample rows via datasets.load_dataset...")
     hf_ds = load_using_hf()
-    #get_hf_stream_batch(hf_ds)
+    get_hf_stream_batch(hf_ds)
 
     print("\nLoading Lance dataset (IVF_PQ index bundled; run queries locally for best perf)...")
     ds = load_dataset()

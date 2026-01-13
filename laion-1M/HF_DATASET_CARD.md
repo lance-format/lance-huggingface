@@ -31,15 +31,15 @@ A lance dataset of LAION image-text corpus (~1M rows) with inline JPEG bytes, CL
 
 ```python
 import datasets
-import pyarrow as pa
+import pandas as pd
 
 hf_ds = datasets.load_dataset(
     "lance-format/laion-subset",
     split="train",
     streaming=True,
 )
-rows = list(hf_ds.take(5))
-print(pa.Table.from_pylist(rows))
+batch = list(hf_ds.take(5))
+print(pd.DataFrame.from_records(batch).head())
 ```
 
 ## Load with Lance
@@ -74,12 +74,13 @@ import pyarrow as pa
 lance_ds = lance.dataset("hf://datasets/lance-format/laion-subset")
 
 # Vector search via img_emb IVF_PQ index
+emb_field = lance_ds.schema.field("img_emb")
 ref = lance_ds.take([0], columns=["img_emb"]).to_pylist()[0]
-query = pa.array([ref["img_emb"]], type=lance_ds.schema.field("img_emb").type)
+query = pa.array([ref["img_emb"]], type=emb_field.type)
 
 neighbors = lance_ds.scanner(
     nearest={
-        "column": "img_emb",
+        "column": emb_field.name,
         "q": query[0],
         "k": 6,
         "nprobes": 16,
@@ -137,12 +138,13 @@ for i, row in enumerate(rows):
 ### 3. Vector similarity search
 
 ```python
+emb_field = ds.schema.field("img_emb")
 ref = ds.take([123], columns=["img_emb"]).to_pylist()[0]
-query = pa.array([ref["img_emb"]], type=ds.schema.field("img_emb").type)
+query = pa.array([ref["img_emb"]], type=emb_field.type)
 
 neighbors = ds.scanner(
     nearest={
-        "column": "img_emb",
+        "column": emb_field.name,
         "q": query[0],
         "k": 6,
         "nprobes": 16,
