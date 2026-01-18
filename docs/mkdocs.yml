@@ -1,0 +1,64 @@
+site_name: Lance-Hugging Face
+site_description: Integration between Lance format and Hugging Face Hub - scan and search your multimodal datasets directly on the Hub using this integration
+site_url: https://lance-format.github.io/lance-huggingface/
+docs_dir: src
+
+repo_name: lance-format/lance-huggingface
+repo_url: https://github.com/lance-format/lance-huggingface
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - awesome-pages
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/lance-format/lance-huggingface
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/zMM32dvNtd
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/lancedb
