@@ -37,12 +37,11 @@ The built documentation will be in the `site/` directory.
 
 ## Documentation Structure
 
-- `mkdocs.yml` - MkDocs configuration
-- `src/` - Documentation source files in Markdown
-  - `index.md` - Homepage
+  - `mkdocs.yml` - MkDocs configuration
+  - `src/` - Documentation source files in Markdown
+  - `index.md` - Homepage and usage examples
   - `read.md` - Read operations guide
   - `write.md` - Write operations guide  
-  - `examples.md` - Usage examples
   - `.pages` - Navigation configuration
 
 ## Adding New Pages
