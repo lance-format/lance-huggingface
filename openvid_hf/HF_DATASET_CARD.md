@@ -244,7 +244,7 @@ high_quality = ds.scanner(
 
 ## Dataset Evolution
 
-Lance supports transactional schema evolution ([docs](https://lance.org/guide/data_evolution/?h=evol)). You can add/drop columns, backfill with SQL or Python, rename fields, or change data types without rewriting the whole dataset. In practice this lets you:
+Lance supports flexible schema and data evolution ([docs](https://lance.org/guide/data_evolution/?h=evol)). You can add/drop columns, backfill with SQL or Python, rename fields, or change data types without rewriting the whole dataset. In practice this lets you:
 - Introduce fresh metadata (moderation labels, embeddings, quality scores) as new signals become available.
 - Add new columns to existing datasets without re-exporting terabytes of video.
 - Adjust column names or shrink storage (e.g., cast embeddings to float16) while keeping previous snapshots queryable for reproducibility.
