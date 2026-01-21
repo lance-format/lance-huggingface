@@ -12,6 +12,7 @@ from pathlib import Path
 
 import av
 import lance
+import lancedb
 import datasets
 import pyarrow as pa
 
@@ -57,9 +58,15 @@ def get_hf_stream_batch(ds, batch_size=5):
 
 
 def load_dataset():
-    ds = lance.dataset("hf://datasets/lance-format/openvid-lance")
+    ds = lance.dataset("hf://datasets/lance-format/openvid-lance/data/train.lance")
     print(f"✓ Loaded {ds.count_rows()} videos")
     return ds
+
+def load_lancedb_table():
+    db = lancedb.connect("hf://lance-format/openvid-lance")
+    tbl = db.open_table("train")
+    print(f"✓ Loaded LanceDB table with {len(tbl)} videos")
+    return tbl
 
 
 # ============================================================================
@@ -115,6 +122,7 @@ def export_batch_videos(ds, output_dir="./videos", limit=5, offset=0):
         save_video_blob(blob_bytes, str(output_path))
 
 
+
 def inspect_video_with_pyav(ds, video_index=0):
     """Seek within a blob and print the first frame past each timestamp."""
     print(f"\nInspecting video index {video_index} with PyAV")
@@ -145,6 +153,8 @@ def inspect_video_with_pyav(ds, video_index=0):
             )
 
 
+
+
 # ============================================================================
 # 3. VECTOR SEARCH
 # ============================================================================
@@ -164,6 +174,11 @@ def vector_search(ds, query_embedding, k=10, nprobes=1, refine_factor=1):
     
     return results
 
+def vector_search_lancedb(tbl, query_embedding, k=10, nprobes=1, refine_factor=1):
+    results = tbl.search(query_embedding) \
+        .limit(k) \
+        .to_pylist()
+    return results
 
 def find_similar_videos(ds, video_index, k=5, nprobes=1):
     ref_table = ds.take([video_index], columns=["embedding", "caption"])
@@ -173,6 +188,25 @@ def find_similar_videos(ds, video_index, k=5, nprobes=1):
     print(f"Searching with nprobes={nprobes}...\n")
     
     results = vector_search(ds, ref['embedding'], k=k+1, nprobes=nprobes)
+    
+    similar = results[1:k+1]
+    
+    print(f"Top {k} similar videos:")
+    for i, video in enumerate(similar, 1):
+        print(f"  {i}. {video['caption'][:60]}...")
+        print(f"     Aesthetic: {video['aesthetic_score']:.2f}")
+    
+    return similar
+
+def find_similar_videos_lancedb(tbl, video_index, k=5, nprobes=1):
+    # Get the reference video's embedding and caption using a query
+    ref_df = tbl.limit(1).offset(video_index).select(["embedding", "caption"]).to_pandas()
+    ref = ref_df.to_dict('records')[0]
+    
+    print(f"\nQuery video: {ref['caption']}")
+    print(f"Searching with nprobes={nprobes}...\n")
+    
+    results = vector_search_lancedb(tbl, ref['embedding'], k=k+1, nprobes=nprobes)
     
     similar = results[1:k+1]
     
@@ -199,11 +233,30 @@ def fts_search(ds, query_text, limit=10):
     
     return results
 
+def fts_search_lancedb(tbl, query_text, limit=10):
+    # Full-text search on captions using LanceDB's FTS
+    results = tbl.search(query_text) \
+        .select(["caption", "aesthetic_score", "motion_score"]) \
+        .limit(limit) \
+        .to_pylist()
+    return results
 
 def search_captions(ds, query, limit=5):
     print(f"\nSearching for: '{query}'")
     
     results = fts_search(ds, query, limit=limit)
+    
+    print(f"Found {len(results)} results:")
+    for i, video in enumerate(results, 1):
+        print(f"  {i}. {video['caption'][:60]}...")
+        print(f"     Quality: aesthetic={video['aesthetic_score']:.2f}")
+    
+    return results
+
+def search_captions_lancedb(tbl, query, limit=5):
+    print(f"\nSearching for: '{query}'")
+    
+    results = fts_search_lancedb(tbl, query, limit=limit)
     
     print(f"Found {len(results)} results:")
     for i, video in enumerate(results, 1):
@@ -231,7 +284,11 @@ if __name__ == "__main__":
     export_batch_videos(ds, output_dir="./example_videos", limit=3, offset=0)
     
     print("="*70)
-    print("EXAMPLE 2: Vector Search with nprobes=1")
+    print("EXAMPLE 2: Inspecting Indices")
+    print(ds.list_indices())
+
+    print("="*70)
+    print("EXAMPLE 3: Vector Search with nprobes=1")
     similar = find_similar_videos(ds, video_index=100, k=5, nprobes=1)
     
     print("="*70)
@@ -241,4 +298,27 @@ if __name__ == "__main__":
     print("="*70)
     print("EXAMPLE 4: PyAV Decode & Seeks")
     inspect_video_with_pyav(ds, video_index=3500)
-    
+
+    # ============================================================================
+    # LANCE DB EXAMPLES
+    # ============================================================================
+    print("\n" + "="*30 + " LANCEDB EXAMPLES " + "="*30)
+
+    print("\nLoading dataset using lancedb")
+    tbl = load_lancedb_table()
+
+    print("="*70)
+    print("LANCEDB EXAMPLE 1: Inspecting Indices")
+
+    lance_ds_from_tbl = tbl.to_lance()
+    indices_lancedb = lance_ds_from_tbl.list_indices()
+    for index in indices_lancedb:
+        print(f"  Index Name: {index.name}, Columns: {index.columns}, Type: {index.index_type}")
+
+    print("="*70)
+    print("LANCEDB EXAMPLE 2: Vector Search with nprobes=1")
+    similar_lancedb = find_similar_videos_lancedb(tbl, video_index=100, k=5, nprobes=1)
+
+    print("="*70)
+    print("LANCEDB EXAMPLE 2: Full-Text Search (LanceDB FTS)")
+    results_lancedb = search_captions_lancedb(tbl, "sunset", limit=2)

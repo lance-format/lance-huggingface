@@ -51,6 +51,16 @@ blob_file = lance_ds.take_blobs("video_blob", ids=[0])[0]
 video_bytes = blob_file.read()
 ```
 
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the serverless vector database built on Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://lance-format/openvid-lance")
+tbl = db.open_table("train")
+print(f"LanceDB table opened with {len(tbl)} videos")
+```
+
 
 ## Why Lance?
 
@@ -193,6 +203,20 @@ with av.open(blob_file) as container:
         )
 ```
 
+### 3.5. Inspecting Existing Indices
+
+You can inspect the prebuilt indices on the dataset:
+
+```python
+import lance
+
+# Open the dataset
+dataset = lance.dataset("hf://datasets/lance-format/openvid-lance")
+
+# List all indices
+indices = dataset.list_indices()
+```
+
 ### 4. Vector Similarity Search
 
 ```python
@@ -216,6 +240,28 @@ for video in results[1:]:  # Skip first (query itself)
     print(video['caption'])
 ```
 
+### LanceDB Vector Similarity Search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://lance-format/openvid-lance")
+tbl = db.open_table("train")
+
+# Assuming you have a query_embedding (e.g., from a model or another video)
+query_embedding = tbl.to_lance().take([0], columns=["embedding"]).to_pylist()[0]["embedding"]
+
+results = tbl.search(query_embedding)
+    .metric("L2") \
+    .nprobes(1) \
+    .refine_factor(1) \
+    .limit(5) \
+    .to_pylist()
+
+for video in results[1:]: # Skip first (query itself)
+    print(video['caption'])
+```
+
 ### 5. Full-Text Search
 
 ```python
@@ -226,6 +272,23 @@ results = ds.scanner(
     limit=10,
     fast_search=True
 ).to_table().to_pylist()
+
+for video in results:
+    print(f"{video['caption']} - {video['aesthetic_score']:.2f}")
+```
+
+### LanceDB Full-Text Search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://lance-format/openvid-lance")
+tbl = db.open_table("train")
+
+results = tbl.search("sunset beach") \
+    .select(["caption", "aesthetic_score"]) \
+    .limit(10) \
+    .to_pylist()
 
 for video in results:
     print(f"{video['caption']} - {video['aesthetic_score']:.2f}")
