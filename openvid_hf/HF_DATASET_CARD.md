@@ -217,6 +217,19 @@ indices = dataset.list_indices()
 print(indices)
 ```
 
+While this dataset comes with pre-built indices, you can also create your own custom indices if needed. For example:
+
+```python
+# ds is a local Lance dataset
+ds.create_index(
+    "embedding",
+    index_type="IVF_PQ",
+    num_partitions=256,
+    num_sub_vectors=96,
+    replace=True,
+)
+```
+
 ### 4. Vector Similarity Search
 
 ```python
