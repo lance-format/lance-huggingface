@@ -23,20 +23,15 @@ FineWeb-edu dataset with over 1.5 billion rows. Each passage ships with cleaned 
 
 ```python
 import datasets
-import pyarrow as pa
 
 hf_ds = datasets.load_dataset(
     "lance-format/fineweb-edu",
     split="train",
     streaming=True,
 )
-
-batch_rows = list(hf_ds.take(5))
-batch_table = pa.Table.from_pylist(batch_rows)
-batch_df = batch_table.to_pandas()
-
-print(batch_table)
-print(batch_df.head())
+# Take first three rows and print titles
+for row in hf_ds.take(3):
+    print(row["title"])
 ```
 
 Use Lance's native connector when you need ANN search, FTS, or direct access to embeddings while still pointing to the copy hosted on Hugging Face:
@@ -211,23 +206,29 @@ See `fineweb_edu/example.py` on lance-huggingface repo for a complete walkthroug
 
 ## Dataset Evolution
 
-Lance datasets can evolve without full rewrites—perfect for FineWeb-Edu as new signals arrive. Add schema-only columns, backfill with SQL or Python, merge offline annotations, and rename/cast fields while keeping previous snapshots queryable ([docs](https://lance.org/guide/data_evolution)). The snippet below mirrors the official Lance docs so you can adapt it to your own metadata or embedding workflows.
+Lance supports flexible schema and data evolution ([docs](https://lance.org/guide/data_evolution/?h=evol)). You can add/drop columns, backfill with SQL or Python, rename fields, or change data types without rewriting the whole dataset. In practice this lets you:
+- Introduce fresh metadata (moderation labels, embeddings, quality scores) as new signals become available.
+- Add new columns to existing datasets without re-exporting terabytes of video.
+- Adjust column names or shrink storage (e.g., cast embeddings to float16) while keeping previous snapshots queryable for reproducibility.
 
 ```python
 import lance
 import pyarrow as pa
 import numpy as np
 
+# Assume ds is a local Lance dataset
+# ds = lance.dataset("./fineweb_edu_local")
+
 base = pa.table({"id": pa.array([1, 2, 3]), "text": pa.array(["A", "B", "C"])})
 dataset = lance.write_dataset(base, "fineweb_evolution", mode="overwrite")
 
-# 1. Add placeholder metadata
+# 1. Add a schema-only column (data to be added later)
 dataset.add_columns(pa.field("subject", pa.string()))
 
-# 2. Fill via SQL expressions
+# 2. Add a column with data
 dataset.add_columns({"quality_bucket": "'unknown'"})
 
-# 3. Generate embeddings with a batch UDF
+# 3. Generate rich columns via Python batch UDFs
 @lance.batch_udf()
 def random_embedding(batch):
     vecs = np.random.rand(batch.num_rows, 384).astype("float32")
@@ -238,11 +239,11 @@ def random_embedding(batch):
 
 dataset.add_columns(random_embedding)
 
-# 4. Merge offline annotations
+# 4. Bring in  annotations with merge
 labels = pa.table({"id": pa.array([1, 2, 3]), "label": pa.array(["math", "history", "science"])})
 dataset.merge(labels, "id")
 
-# 5. Rename / cast columns without touching others
+# 5. Rename or cast columns as needs change
 dataset.alter_columns({"path": "subject", "name": "topic"})
 dataset.alter_columns({"path": "text_embedding", "data_type": pa.list_(pa.float16(), 384)})
 ```

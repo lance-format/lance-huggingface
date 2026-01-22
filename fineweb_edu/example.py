@@ -24,9 +24,10 @@ def load_using_hf():
 
 
 def get_hf_stream_batch(ds, batch_size=5):
-    """Consume a batch from the Hugging Face IterableDataset."""
-    rows = list(ds.take(batch_size))
-    return pa.Table.from_pylist(rows)
+    print(f"\nHF streaming batch (first {batch_size} titles):")
+    for i, row in enumerate(ds.take(batch_size)):
+        title = row.get("title") or row.get("url") or "(no title)"
+        print(f"  [{i}] {title}")
 
 
 # ============================================================================
@@ -163,8 +164,7 @@ def search_passages_lancedb(tbl, query, limit=5):
 if __name__ == "__main__":
     print("\nLoading FineWeb-Edu via Hugging Face streaming...")
     hf_ds = load_using_hf()
-    batch = get_hf_stream_batch(hf_ds)
-    print(batch)
+    get_hf_stream_batch(hf_ds)
 
     print("\nLoading Lance dataset for interactive queries...")
     print(
