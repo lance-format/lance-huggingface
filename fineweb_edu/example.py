@@ -5,6 +5,7 @@ import textwrap
 
 import datasets
 import lance
+import lancedb
 import pyarrow as pa
 
 
@@ -33,9 +34,15 @@ def get_hf_stream_batch(ds, batch_size=5):
 # ============================================================================
 
 def load_dataset():
-    ds = lance.dataset("hf://datasets/lance-format/fineweb-edu")
+    ds = lance.dataset("hf://datasets/lance-format/fineweb-edu/data/train.lance")
     print(f"✓ Loaded {ds.count_rows():,} passages")
     return ds
+
+def load_lancedb_table():
+    db = lancedb.connect("hf://datasets/lance-format/fineweb-edu/data")
+    tbl = db.open_table("train")
+    print(f"✓ Loaded LanceDB table with {len(tbl)} passages")
+    return tbl
 
 
 def _existing_columns(ds, preferred):
@@ -79,6 +86,14 @@ def vector_search(ds, query_embedding, embedding_type, k=5, nprobes=1, refine_fa
         columns=["text", "text_embedding"],
     ).to_table().to_pylist()
 
+def vector_search_lancedb(tbl, query_embedding, k=5, nprobes=1, refine_factor=1):
+    results = tbl.search(query_embedding) \
+        .nprobes(nprobes) \
+        .refine_factor(refine_factor) \
+        .limit(k) \
+        .to_list()
+    return results
+
 
 def find_similar_passages(ds, doc_index=0, k=5, nprobes=1):
     if "text_embedding" not in ds.schema.names:
@@ -105,6 +120,45 @@ def find_similar_passages(ds, doc_index=0, k=5, nprobes=1):
         preview = textwrap.shorten((doc.get("text") or "").replace("\n", " "), width=120)
         print(f"  {rank}. {preview}")
 
+def find_similar_passages_lancedb(tbl, doc_index=0, k=5, nprobes=1):
+    # Get the reference passage's embedding and text using a query
+    ref_df = tbl.search().limit(1).offset(doc_index).select(["text", "text_embedding"]).to_pandas()
+    ref = ref_df.to_dict('records')[0]
+
+    results = vector_search_lancedb(
+        tbl,
+        ref["text_embedding"],
+        k=k + 1,
+        nprobes=nprobes,
+        refine_factor=max(10, k * 2),
+    )
+
+    print(f"\nLanceDB Query passage [{doc_index}]:")
+    print(textwrap.shorten((ref.get("text") or "").replace("\n", " "), width=200))
+
+    print(f"\nLanceDB Top {k} similar passages:")
+    for rank, doc in enumerate(results[1:k + 1], start=1):
+        preview = textwrap.shorten((doc.get("text") or "").replace("\n", " "), width=120)
+        print(f"  {rank}. {preview}")
+
+def fts_search_lancedb(tbl, query_text, limit=10):
+    results = tbl.search(query_text) \
+        .select(["title", "language", "text"]) \
+        .limit(limit) \
+        .nprobes(1) \
+        .to_list()
+    return results
+
+def search_passages_lancedb(tbl, query, limit=5):
+    print(f"\nLanceDB Searching for: '{query}'")
+    results = fts_search_lancedb(tbl, query, limit=limit)
+    print(f"Found {len(results)} results:")
+    for i, doc in enumerate(results, 1):
+        title = doc.get("title") or "(no title)"
+        lang = doc.get("language") or "?"
+        preview = textwrap.shorten((doc.get("text") or "").replace("\n", " "), width=120)
+        print(f"  {i}. {title} [{lang}] -> {preview}")
+
 
 if __name__ == "__main__":
     print("\nLoading FineWeb-Edu via Hugging Face streaming...")
@@ -114,10 +168,31 @@ if __name__ == "__main__":
 
     print("\nLoading Lance dataset for interactive queries...")
     print(
-        "NOTE: The Hub copy is huge; vector/FTS demos require local Lance storage. "
-        "Pre-built indices are coming soon—run these ops after downloading."
+        "NOTE: The Hub copy is huge and does not have pre-built indices. "
+        "Vector/FTS demos will be very slow or fail due to rate limits. "
+        "For search/similarity, download the dataset and build indices locally."
     )
     ds = load_dataset()
+    print("\nInspecting Lance dataset indices:")
+    print(ds.list_indices())
 
     show_samples(ds, limit=3, offset=0)
     find_similar_passages(ds, doc_index=42, k=5, nprobes=8)
+
+    # ============================================================================
+    # LANCE DB EXAMPLES
+    # ============================================================================
+    print("\n" + "="*30 + " LANCEDB EXAMPLES " + "="*30)
+
+    print("\nLoading dataset using lancedb")
+    tbl = load_lancedb_table()
+    print("\nInspecting LanceDB table indices:")
+    print(tbl.to_lance().list_indices())
+
+    print("\n" + "="*70)
+    print("LANCEDB EXAMPLE 1: Vector Search")
+    find_similar_passages_lancedb(tbl, doc_index=42, k=5, nprobes=8)
+
+    print("\n" + "="*70)
+    print("LANCEDB EXAMPLE 2: Full-Text Search")
+    search_passages_lancedb(tbl, "quantum computing", limit=3)

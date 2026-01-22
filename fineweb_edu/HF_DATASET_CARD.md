@@ -44,14 +44,36 @@ Use Lance's native connector when you need ANN search, FTS, or direct access to 
 ```python
 import lance
 
-ds = lance.dataset("hf://datasets/lance-format/fineweb-edu")
-print(f"Total passages: {ds.count_rows():,}")
+ds = lance.dataset("hf://datasets/lance-format/fineweb-edu/data/train.lance")print(f"Total passages: {ds.count_rows():,}")
+```
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the serverless vector database built on Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/fineweb-edu/data")
+tbl = db.open_table("train")
+print(f"LanceDB table opened with {len(tbl)} passages")
 ```
 
 
-> **Index Status & Streaming Guidance**
-> - Pre-built ANN/FTS indexes aren't uploaded yet— It is recommended todownload the dataset locally and build indexes yourself before running similarity/search demos. 
-> - The corpus is large (~1.5B passages). Heavy retrieval workloads should point Lance at a local copy.
+
+> The dataset hosted on Hugging Face Hub does **not** currently have pre-built ANN (vector) or FTS (full-text search) indices.
+>
+
+> - For any search or similarity workloads, you should download the dataset locally and build indices yourself.
+>
+> ```bash
+> # Download once
+> huggingface-cli download lance-format/fineweb-edu --repo-type dataset --local-dir ./fineweb-edu
+>
+> # Then load locally and build indices
+> import lance
+> ds = lance.dataset("./fineweb-edu")
+> # ds.create_index(...)
+> ```
+>
 
 
 ## Why Lance?
@@ -68,7 +90,7 @@ print(f"Total passages: {ds.count_rows():,}")
 import lance
 import pyarrow as pa
 
-lance_ds = lance.dataset("hf://datasets/lance-format/fineweb-edu")
+lance_ds = lance.dataset("hf://datasets/lance-format/fineweb-edu/data/train.lance")
 
 # Browse titles & language without touching embeddings
 rows = lance_ds.scanner(
@@ -144,6 +166,22 @@ neighbors = ds.scanner(
 ).to_table().to_pylist()[1:]
 ```
 
+### LanceDB Vector Search
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/fineweb-edu/data")
+tbl = db.open_table("train")
+
+# Get a passage to use as a query
+ref_passage = tbl.limit(1).offset(123).select(["text_embedding", "text"]).to_pandas().to_dict('records')[0]
+query_embedding = ref_passage["text_embedding"]
+
+results = tbl.search(query_embedding) \
+    .limit(5) \
+    .to_list()
+```
+
 ### 3. Full-text search with Lance FTS
 
 ```python
@@ -153,6 +191,19 @@ hits = ds.scanner(
     limit=10,
     fast_search=True,
 ).to_table().to_pylist()
+```
+
+### LanceDB Full-Text Search
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/fineweb-edu/data")
+tbl = db.open_table("train")
+
+results = tbl.search("quantum computing") \
+    .select(["title", "language", "text"]) \
+    .limit(10) \
+    .to_list()
 ```
 
 
