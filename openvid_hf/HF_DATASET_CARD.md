@@ -26,7 +26,51 @@ The dataset is stored in lance format with inline video blobs, video embeddings,
 - **Efficient column access** - Load metadata without touching video data
 - **Prebuilt indices available** - IVF_PQ index for similarity search, FTS index on captions
 - **Fast random access** - Read any video instantly by index
-- **HuggingFace integration** - Load directly from the Hub in streaming mode
+- **HuggingFace integration** - Load directly from the Hub
+
+## Load lance dataset using `datasets.load_dataset`
+
+```python
+import datasets
+
+hf_ds = datasets.load_dataset(
+    "lance-format/openvid-lance",
+    split="train",
+    streaming=True,
+)
+# Take first three rows and print captions
+for row in hf_ds.take(3):
+    print(row["caption"])
+```
+
+You can also load lance datasets from HF hub using native API when you want blob bytes or advanced indexing while still pointing at the same dataset on the Hub:
+
+```python
+import lance
+
+lance_ds = lance.dataset("hf://datasets/lance-format/openvid-lance/data/train.lance")
+blob_file = lance_ds.take_blobs("video_blob", ids=[0])[0]
+video_bytes = blob_file.read()
+```
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the serverless vector database built on Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/openvid-lance/data")
+tbl = db.open_table("train")
+print(f"LanceDB table opened with {len(tbl)} videos")
+```
+
+
+## Why Lance?
+
+- Optimized for AI workloads: Lance keeps multimodal data and vector search-ready storage in the same columnar format designed for accelerator-era retrieval (see [lance.org](https://lance.org)).
+- Images + embeddings + metadata travel as one tabular dataset.
+- On-disk, scalable ANN index means
+- Schema evolution lets you add new features/columns (moderation tags, embeddings, etc.) without rewriting the raw data.
+
 
 ## Lance Blob API
 
@@ -67,8 +111,7 @@ with open("video.mp4", "wb") as f:
 ```python
 import lance
 
-# Load dataset from HuggingFace
-ds = lance.dataset("hf://datasets/lance-format/openvid-lance")
+ds = lance.dataset("hf://datasets/lance-format/openvid-lance/data/train.lance")
 print(f"Total videos: {ds.count_rows():,}")
 ```
 
@@ -89,6 +132,7 @@ print(f"Total videos: {ds.count_rows():,}")
 > ```
 > 
 > Streaming is recommended only for quick exploration and testing.
+
 
 ## Dataset Schema
 
@@ -160,6 +204,34 @@ with av.open(blob_file) as container:
         )
 ```
 
+### 3.5. Inspecting Existing Indices
+
+You can inspect the prebuilt indices on the dataset:
+
+```python
+import lance
+
+# Open the dataset
+dataset = lance.dataset("hf://datasets/lance-format/openvid-lance/data/train.lance")
+
+# List all indices
+indices = dataset.list_indices()
+print(indices)
+```
+
+While this dataset comes with pre-built indices, you can also create your own custom indices if needed. For example:
+
+```python
+# ds is a local Lance dataset
+ds.create_index(
+    "embedding",
+    index_type="IVF_PQ",
+    num_partitions=256,
+    num_sub_vectors=96,
+    replace=True,
+)
+```
+
 ### 4. Vector Similarity Search
 
 ```python
@@ -183,6 +255,28 @@ for video in results[1:]:  # Skip first (query itself)
     print(video['caption'])
 ```
 
+### LanceDB Vector Similarity Search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/openvid-lance/data")
+tbl = db.open_table("train")
+
+# Get a video to use as a query
+ref_video = tbl.limit(1).select(["embedding", "caption"]).to_pandas().to_dict('records')[0]
+query_embedding = ref_video["embedding"]
+
+results = tbl.search(query_embedding) \
+    .metric("L2") \
+    .nprobes(1) \
+    .limit(5) \
+    .to_list()
+
+for video in results[1:]: # Skip first (query itself)
+    print(f"{video['caption'][:60]}...")
+```
+
 ### 5. Full-Text Search
 
 ```python
@@ -193,6 +287,23 @@ results = ds.scanner(
     limit=10,
     fast_search=True
 ).to_table().to_pylist()
+
+for video in results:
+    print(f"{video['caption']} - {video['aesthetic_score']:.2f}")
+```
+
+### LanceDB Full-Text Search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/openvid-lance/data")
+tbl = db.open_table("train")
+
+results = tbl.search("sunset beach") \
+    .select(["caption", "aesthetic_score"]) \
+    .limit(10) \
+    .to_list()
 
 for video in results:
     print(f"{video['caption']} - {video['aesthetic_score']:.2f}")
@@ -209,12 +320,52 @@ high_quality = ds.scanner(
 ).to_table().to_pylist()
 ```
 
-## Dataset Statistics
+## Dataset Evolution
 
-- **Total videos**: 937,957
-- **Embedding dimension**: 1024
-- **Video formats**: MP4 (H.264)
-- **Index types**: IVF_PQ (vector),  FTS
+Lance supports flexible schema and data evolution ([docs](https://lance.org/guide/data_evolution/?h=evol)). You can add/drop columns, backfill with SQL or Python, rename fields, or change data types without rewriting the whole dataset. In practice this lets you:
+- Introduce fresh metadata (moderation labels, embeddings, quality scores) as new signals become available.
+- Add new columns to existing datasets without re-exporting terabytes of video.
+- Adjust column names or shrink storage (e.g., cast embeddings to float16) while keeping previous snapshots queryable for reproducibility.
+
+```python
+import lance
+import pyarrow as pa
+import numpy as np
+
+base = pa.table({"id": pa.array([1, 2, 3])})
+dataset = lance.write_dataset(base, "openvid_evolution", mode="overwrite")
+
+# 1. Grow the schema instantly (metadata-only)
+dataset.add_columns(pa.field("quality_bucket", pa.string()))
+
+# 2. Backfill with SQL expressions or constants
+dataset.add_columns({"status": "'active'"})
+
+# 3. Generate rich columns via Python batch UDFs
+@lance.batch_udf()
+def random_embedding(batch):
+    arr = np.random.rand(batch.num_rows, 128).astype("float32")
+    return pa.RecordBatch.from_arrays(
+        [pa.FixedSizeListArray.from_arrays(arr.ravel(), 128)],
+        names=["embedding"],
+    )
+
+dataset.add_columns(random_embedding)
+
+# 4. Bring in offline annotations with merge
+labels = pa.table({
+    "id": pa.array([1, 2, 3]),
+    "label": pa.array(["horse", "rabbit", "cat"]),
+})
+dataset.merge(labels, "id")
+
+# 5. Rename or cast columns as needs change
+dataset.alter_columns({"path": "quality_bucket", "name": "quality_tier"})
+dataset.alter_columns({"path": "embedding", "data_type": pa.list_(pa.float16(), 128)})
+```
+
+These operations are automatically versioned, so prior experiments can still point to earlier versions while OpenVid keeps evolving.
+
 
 
 ## Citation
