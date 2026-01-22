@@ -22,16 +22,14 @@ def load_using_hf():
         split="train",
         streaming=True,
     )
-    print(ds)
     return ds
 
 
 def get_hf_stream_batch(ds, batch_size=5):
-    batch = list(ds.take(batch_size))
-    df = pd.DataFrame.from_records(batch)
-    print("\nHF streaming batch (pandas view):")
-    print(df.head())
-    return df
+    """Consume a batch from the Hugging Face IterableDataset and print captions."""
+    print(f"\nHF streaming batch (first {batch_size} captions):")
+    for i, row in enumerate(ds.take(batch_size)):
+        print(f"  [{i}] {row.get('caption', '')[:80]}...")
 
 
 # =============================================================================
@@ -167,8 +165,8 @@ def find_similar_images_lancedb(tbl, image_index=0, k=5, nprobes=1, refine_facto
 
 if __name__ == "__main__":
     print("\nStreaming sample rows via datasets.load_dataset...")
-    #hf_ds = load_using_hf()
-    #get_hf_stream_batch(hf_ds)
+    hf_ds = load_using_hf()
+    get_hf_stream_batch(hf_ds)
 
     print("\nLoading Lance dataset (IVF_PQ index bundled; run queries locally for best perf)...")
     ds = load_dataset()

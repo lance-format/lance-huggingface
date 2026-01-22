@@ -31,15 +31,15 @@ A lance dataset of LAION image-text corpus (~1M rows) with inline JPEG bytes, CL
 
 ```python
 import datasets
-import pandas as pd
 
 hf_ds = datasets.load_dataset(
     "lance-format/laion-1m",
     split="train",
-    streaming=True,
+    streaming=True
 )
-batch = list(hf_ds.take(5))
-print(pd.DataFrame.from_records(batch).head())
+# Take first three rows and print captions
+for row in hf_ds.take(3):
+    print(row["caption"])
 ```
 
 ## Load with Lance
@@ -235,17 +235,18 @@ import lance
 import pyarrow as pa
 import numpy as np
 
-# Assume ds is a local Lance dataset
+# Assumes you ran the export to Lance example above to store a local subset of the data
 # ds = lance.dataset("./laion_1m_local")
 
-base = pa.table({"id": pa.array([1, 2, 3])})
-dataset = lance.write_dataset(base, "laion_evolution", mode="overwrite")
+# 1. Add a schema-only column (data to be added later)
+dataset.add_columns(pa.field("moderation_label", pa.string()))
 
-# 1. Grow the schema instantly (metadata-only)
-dataset.add_columns(pa.field("quality_bucket", pa.string()))
-
-# 2. Backfill with SQL expressions or constants
-dataset.add_columns({"status": "'active'"})
+# 2. Add a column with data backfill using a SQL expression
+dataset.add_columns(
+    {
+        "moderation_label": "case WHEN \"NSFW\" > 0.5 THEN 'review' ELSE 'ok' END"
+    }
+)
 
 # 3. Generate rich columns via Python batch UDFs
 @lance.batch_udf()
