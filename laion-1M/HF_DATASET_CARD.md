@@ -145,7 +145,6 @@ for idx, row in enumerate(rows):
 ```
 
 Images are stored inline as binary columns (regular Lance binary, not the special blob handle used in OpenVid). They behave like any other column—scan captions without touching `image`, then `take()` when you want the bytes.
-```
 
 ## Dataset Schema
 
