@@ -32,13 +32,15 @@ The dataset is stored in lance format with inline video blobs, video embeddings,
 
 ```python
 import datasets
-import pyarrow as pa
 
 hf_ds = datasets.load_dataset(
     "lance-format/openvid-lance",
     split="train",
     streaming=True,
 )
+# Take first three rows and print captions
+for row in hf_ds.take(3):
+    print(row["caption"])
 ```
 
 You can also load lance datasets from HF hub using native API when you want blob bytes or advanced indexing while still pointing at the same dataset on the Hub:

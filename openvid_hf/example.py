@@ -44,9 +44,9 @@ def load_using_hf():
 
 
 def get_hf_stream_batch(ds, batch_size=5):
-    """Consume a batch from the Hugging Face IterableDataset"""
-    rows = list(ds.take(batch_size))
-    return pa.Table.from_pylist(rows)
+    print(f"\nHF streaming batch (first {batch_size} captions):")
+    for i, row in enumerate(ds.take(batch_size)):
+        print(f"  [{i}] {row.get('caption', '')[:80]}...")
 
 
 def load_dataset():
@@ -126,8 +126,7 @@ if __name__ == "__main__":
     # 1. Load dataset from HuggingFace Hub
     print("\nLoading dataset using hf and getting a batch...")
     hf_ds = load_using_hf()
-    batch = get_hf_stream_batch(hf_ds)
-    print(batch)
+    get_hf_stream_batch(hf_ds)
 
     print("\nLoading full dataset using lance")
     ds = load_dataset()
