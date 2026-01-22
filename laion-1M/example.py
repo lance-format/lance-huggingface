@@ -4,6 +4,7 @@
 
 import datasets
 import lance
+import lancedb
 import pandas as pd
 import pyarrow as pa
 
@@ -17,7 +18,7 @@ from PIL import Image
 
 def load_using_hf():
     ds = datasets.load_dataset(
-        "lance-format/laion-subset",
+        "lance-format/laion-1m",
         split="train",
         streaming=True,
     )
@@ -38,9 +39,16 @@ def get_hf_stream_batch(ds, batch_size=5):
 # =============================================================================
 
 def load_dataset():
-    ds = lance.dataset("hf://datasets/lance-format/laion-subset")
+    ds = lance.dataset("hf://datasets/lance-format/laion-1m/data/train.lance")
     print(f"✓ Loaded {ds.count_rows():,} image-text pairs")
+    print(ds.schema)
     return ds
+
+def load_lancedb_table():
+    db = lancedb.connect("hf://datasets/lance-format/laion-1m/data")
+    tbl = db.open_table("train")
+    print(f"✓ Loaded LanceDB table with {len(tbl)} image-text pairs")
+    return tbl
 
 
 def show_metadata(ds, limit=5, offset=0):
@@ -116,15 +124,74 @@ def filter_quality(ds, min_similarity=0.35, limit=5):
         print(f"  {row['similarity']:.3f} | {row['caption'][:80]} | {row['url']}")
 
 
+def filter_quality(ds, min_similarity=0.35, limit=5):
+    rows = ds.scanner(
+        columns=["caption", "url", "similarity", "NSFW"],
+        filter=f"similarity >= {float(min_similarity)} AND \"NSFW\" = 0",
+        limit=limit,
+    ).to_table().to_pylist()
+
+    print(f"\nHigh-similarity safe rows (>= {min_similarity}):")
+    for row in rows:
+        print(f"  {row['similarity']:.3f} | {row['caption'][:80]} | {row['url']}")
+
+def vector_search_lancedb(tbl, query_embedding, k=5, nprobes=1, refine_factor=1):
+    results = tbl.search(query_embedding) \
+        .metric("L2") \
+        .nprobes(nprobes) \
+        .refine_factor(refine_factor) \
+        .limit(k) \
+        .to_list()
+    return results
+
+def find_similar_images_lancedb(tbl, image_index=0, k=5, nprobes=1, refine_factor=1):
+    # Get the reference image's embedding and caption using a query
+    ref_df = tbl.search().limit(1).offset(image_index).select(["img_emb", "caption", "url", "similarity"]).to_pandas()
+    ref = ref_df.to_dict('records')[0]
+
+    results = vector_search_lancedb(
+        tbl,
+        ref["img_emb"],
+        k=k + 1,
+        nprobes=nprobes,
+        refine_factor=refine_factor,
+    )
+
+    print(f"\nLanceDB Query image {image_index}: {ref.get('caption', '')[:80]}")
+    print(f"LanceDB Top {k} similar images:")
+    for rank, row in enumerate(results[1:k + 1], start=1):
+        print(f"  {rank}. sim={row.get('similarity'):.3f} | {row.get('caption', '')[:80]}")
+        print(f"     URL: {row.get('url')}")
+
+
+
 if __name__ == "__main__":
     print("\nStreaming sample rows via datasets.load_dataset...")
-    hf_ds = load_using_hf()
-    get_hf_stream_batch(hf_ds)
+    #hf_ds = load_using_hf()
+    #get_hf_stream_batch(hf_ds)
 
     print("\nLoading Lance dataset (IVF_PQ index bundled; run queries locally for best perf)...")
     ds = load_dataset()
+    print("\nInspecting Lance dataset indices:")
+    print(ds.list_indices())
 
     show_metadata(ds, limit=3, offset=0)
     filter_quality(ds, min_similarity=0.4, limit=3)
     export_images(ds, ids=[0, 1, 2])
     find_similar_images(ds, image_index=42, k=5)
+
+    # ============================================================================
+    # LANCE DB EXAMPLES
+    # ============================================================================
+    print("\n" + "="*30 + " LANCEDB EXAMPLES " + "="*30)
+
+    print("\nLoading dataset using lancedb")
+    tbl = load_lancedb_table()
+    print("\nInspecting LanceDB table indices:")
+    print(tbl.to_lance().list_indices())
+
+    print("\n" + "="*70)
+    print("LANCEDB EXAMPLE 1: Vector Search")
+    find_similar_images_lancedb(tbl, image_index=42, k=5)
+
+
