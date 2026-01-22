@@ -56,7 +56,7 @@ These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb
 ```python
 import lancedb
 
-db = lancedb.connect("hf://lance-format/openvid-lance")
+db = lancedb.connect("hf://datasets/lance-format/openvid-lance/data")
 tbl = db.open_table("train")
 print(f"LanceDB table opened with {len(tbl)} videos")
 ```
@@ -215,6 +215,7 @@ dataset = lance.dataset("hf://datasets/lance-format/openvid-lance")
 
 # List all indices
 indices = dataset.list_indices()
+print(indices)
 ```
 
 ### 4. Vector Similarity Search
@@ -245,21 +246,21 @@ for video in results[1:]:  # Skip first (query itself)
 ```python
 import lancedb
 
-db = lancedb.connect("hf://lance-format/openvid-lance")
+db = lancedb.connect("hf://datasets/lance-format/openvid-lance/data")
 tbl = db.open_table("train")
 
-# Assuming you have a query_embedding (e.g., from a model or another video)
-query_embedding = tbl.to_lance().take([0], columns=["embedding"]).to_pylist()[0]["embedding"]
+# Get a video to use as a query
+ref_video = tbl.limit(1).select(["embedding", "caption"]).to_pandas().to_dict('records')[0]
+query_embedding = ref_video["embedding"]
 
-results = tbl.search(query_embedding)
+results = tbl.search(query_embedding) \
     .metric("L2") \
     .nprobes(1) \
-    .refine_factor(1) \
     .limit(5) \
     .to_pylist()
 
 for video in results[1:]: # Skip first (query itself)
-    print(video['caption'])
+    print(f"{video['caption'][:60]}...")
 ```
 
 ### 5. Full-Text Search
@@ -282,7 +283,7 @@ for video in results:
 ```python
 import lancedb
 
-db = lancedb.connect("hf://lance-format/openvid-lance")
+db = lancedb.connect("hf://datasets/lance-format/openvid-lance/data")
 tbl = db.open_table("train")
 
 results = tbl.search("sunset beach") \
