@@ -46,7 +46,7 @@ You can also load lance datasets from HF hub using native API when you want blob
 ```python
 import lance
 
-lance_ds = lance.dataset("hf://datasets/lance-format/openvid-lance")
+lance_ds = lance.dataset("hf://datasets/lance-format/openvid-lance/data/train.lance")
 blob_file = lance_ds.take_blobs("video_blob", ids=[0])[0]
 video_bytes = blob_file.read()
 ```
@@ -109,8 +109,7 @@ with open("video.mp4", "wb") as f:
 ```python
 import lance
 
-# Load dataset from HuggingFace
-ds = lance.dataset("hf://datasets/lance-format/openvid-lance")
+ds = lance.dataset("hf://datasets/lance-format/openvid-lance/data/train.lance")
 print(f"Total videos: {ds.count_rows():,}")
 ```
 
@@ -211,7 +210,7 @@ You can inspect the prebuilt indices on the dataset:
 import lance
 
 # Open the dataset
-dataset = lance.dataset("hf://datasets/lance-format/openvid-lance")
+dataset = lance.dataset("hf://datasets/lance-format/openvid-lance/data/train.lance")
 
 # List all indices
 indices = dataset.list_indices()
@@ -257,7 +256,7 @@ results = tbl.search(query_embedding) \
     .metric("L2") \
     .nprobes(1) \
     .limit(5) \
-    .to_pylist()
+    .to_list()
 
 for video in results[1:]: # Skip first (query itself)
     print(f"{video['caption'][:60]}...")
@@ -289,7 +288,7 @@ tbl = db.open_table("train")
 results = tbl.search("sunset beach") \
     .select(["caption", "aesthetic_score"]) \
     .limit(10) \
-    .to_pylist()
+    .to_list()
 
 for video in results:
     print(f"{video['caption']} - {video['aesthetic_score']:.2f}")
