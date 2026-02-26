@@ -4,7 +4,14 @@ version = "0.1.0"
 description = "LeRobot in Lance format"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["pyarrow", "datasets", "pylance", "huggingface_hub"]
+dependencies = [
+    "av>=16.1.0",
+    "huggingface-hub[cli]>=1.4.1",
+    "polars>=1.38.1",
+    "pyarrow>=23.0.1",
+    "pylance>=2.0.1",
+    "torch>=2.10.0",
+]
 
 [dependency-groups]
 dev = ["ruff"]
