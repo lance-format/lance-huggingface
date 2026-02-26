@@ -206,3 +206,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# mac
+.DS_Store
+
+# local
+lerobot/xvla-soft-fold/data/
+lerobot/xvla-soft-fold/meta/
+lerobot/xvla-soft-fold/videos/
+lerobot/xvla-soft-fold/lance/
+
