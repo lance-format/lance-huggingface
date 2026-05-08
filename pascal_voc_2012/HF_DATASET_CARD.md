@@ -1,0 +1,116 @@
+---
+license: other
+task_categories:
+- image-segmentation
+- image-feature-extraction
+language:
+- en
+tags:
+- pascal-voc
+- voc-2012
+- semantic-segmentation
+- lance
+- clip-embeddings
+pretty_name: pascal-voc-2012-segmentation-lance
+size_categories:
+- 1K<n<10K
+---
+# Pascal VOC 2012 Segmentation (Lance Format)
+
+A Lance-formatted version of the [Pascal VOC 2012 semantic segmentation split](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/) (sourced from [`nateraw/pascal-voc-2012`](https://huggingface.co/datasets/nateraw/pascal-voc-2012)) — **2,913 image / mask pairs** with CLIP image embeddings stored inline and a pre-built `IVF_PQ` ANN index.
+
+## Why segmentation?
+
+VOC 2012 ships several tasks (classification, detection, segmentation, action). We focus on the **semantic segmentation** subset because every row carries a paired mask image and the dataset is small enough to convert quickly with full embeddings — useful as a smoke test or a small benchmark.
+
+## Splits
+
+| Split | Rows |
+|-------|------|
+| `train.lance`      | 1,464 |
+| `validation.lance` | 1,449 |
+
+## Schema
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `int64` | Row index within the split |
+| `image` | `large_binary` | Inline JPEG bytes |
+| `mask` | `large_binary` | Inline PNG bytes — class id per pixel (0=background, 1-20=VOC classes, 255=void) |
+| `image_emb` | `fixed_size_list<float32, 512>` | OpenCLIP `ViT-B-32` image embedding (cosine-normalized) |
+
+The 20 Pascal VOC classes are: `aeroplane`, `bicycle`, `bird`, `boat`, `bottle`, `bus`, `car`, `cat`, `chair`, `cow`, `diningtable`, `dog`, `horse`, `motorbike`, `person`, `pottedplant`, `sheep`, `sofa`, `train`, `tvmonitor`.
+
+## Pre-built indices
+
+- `IVF_PQ` on `image_emb` — `metric=cosine`
+
+> Note: the small dataset size (≤1,464 rows per split) is below Lance's
+> default partition count, so the helper falls back to a smaller
+> `num_partitions` automatically. For higher recall, build the index with
+> `num_partitions=16` against a local copy.
+
+## Quick start
+
+```python
+import lance
+
+ds = lance.dataset("hf://datasets/lance-format/pascal-voc-2012-segmentation-lance/data/train.lance")
+print(ds.count_rows(), ds.schema.names, ds.list_indices())
+```
+
+## Working with images and masks
+
+```python
+from pathlib import Path
+import lance
+from PIL import Image
+import io
+
+ds = lance.dataset("hf://datasets/lance-format/pascal-voc-2012-segmentation-lance/data/train.lance")
+row = ds.take([0], columns=["image", "mask"]).to_pylist()[0]
+Path("img.jpg").write_bytes(row["image"])
+Path("mask.png").write_bytes(row["mask"])
+
+import numpy as np
+mask = np.array(Image.open(io.BytesIO(row["mask"])))
+print("classes present:", np.unique(mask).tolist())
+```
+
+## Vector search example
+
+```python
+import lance
+import pyarrow as pa
+
+ds = lance.dataset("hf://datasets/lance-format/pascal-voc-2012-segmentation-lance/data/train.lance")
+emb_field = ds.schema.field("image_emb")
+ref = ds.take([0], columns=["image_emb"]).to_pylist()[0]["image_emb"]
+query = pa.array([ref], type=emb_field.type)
+
+neighbors = ds.scanner(
+    nearest={"column": "image_emb", "q": query[0], "k": 5},
+    columns=["id"],
+).to_table().to_pylist()
+```
+
+## Why Lance?
+
+- One dataset carries images + masks + embeddings + indices — no sidecar files.
+- On-disk vector and full-text indices live next to the data, so search works on local copies and on the Hub.
+- Schema evolution: add columns (instance masks, alternate embeddings, model predictions) without rewriting the data.
+
+## Source & license
+
+Converted from [`nateraw/pascal-voc-2012`](https://huggingface.co/datasets/nateraw/pascal-voc-2012). The Pascal VOC dataset is released under [its own custom license](http://host.robots.ox.ac.uk/pascal/VOC/) — please review before redistribution.
+
+## Citation
+
+```
+@misc{everingham2012pascal,
+  title={The Pascal Visual Object Classes Challenge: A Retrospective},
+  author={Everingham, Mark and Eslami, S. M. Ali and Van Gool, Luc and Williams, Christopher K. I. and Winn, John and Zisserman, Andrew},
+  journal={International Journal of Computer Vision},
+  year={2015}
+}
+```
