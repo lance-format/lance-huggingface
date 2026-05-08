@@ -25,7 +25,14 @@ Lance-formatted version of [VQAv2](https://visualqa.org/) — Visual Question An
 | Split | Rows |
 |-------|------|
 | `validation.lance` | 214,354 |
-| `train.lance`      | 443,757 |
+
+> **Train split note.** `lmms-lab/VQAv2` ships `train`, `validation`, `testdev`,
+> and `test` parquet shards but only declares the eval splits in its
+> `dataset_info`, so `datasets.load_dataset(..., split="train")` raises. The
+> `vqav2/dataprep.py` script in this repo builds the validation split today;
+> the train split (444k rows) can be enabled in a follow-up by reading the
+> `data/train-*.parquet` shards directly with PyArrow or by switching to
+> `Multimodal-Fatima/VQAv2_train`. Track progress in `TRACKED_DATASETS.md`.
 
 ## Schema
 

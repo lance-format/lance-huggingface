@@ -52,10 +52,18 @@ for folder in "$@"; do
 
     echo "===== converting $name -> $repo_id ====="
     log="$LOG_DIR/$name.convert.log"
-    "$PY" "$folder_abs/dataprep.py" --overwrite >"$log" 2>&1
+    if ! "$PY" "$folder_abs/dataprep.py" --overwrite >"$log" 2>&1; then
+        echo "[orchestrator] convert failed for $name (see $log) — continuing with next dataset"
+        continue
+    fi
 
     if [[ -f "$folder_abs/HF_DATASET_CARD.md" && -d "$local_path" ]]; then
         cp "$folder_abs/HF_DATASET_CARD.md" "$local_path/README.md"
+    fi
+
+    if [[ ! -d "$local_path" ]]; then
+        echo "[orchestrator] $local_path does not exist after conversion of $name — skipping upload"
+        continue
     fi
 
     upload_log="$LOG_DIR/$name.upload.log"

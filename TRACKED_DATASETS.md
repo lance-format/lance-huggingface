@@ -17,21 +17,21 @@ Status legend: ✅ live · 🟡 in flight · ⏳ queued · ⛔ skipped (with rea
 | `cifar10/` | [`lance-format/cifar10-lance`](https://huggingface.co/datasets/lance-format/cifar10-lance) | uoft-cs/cifar10 | train · test | CLIP IVF_PQ + BTREE/BITMAP | ✅ |
 | `fashion_mnist/` | [`lance-format/fashion-mnist-lance`](https://huggingface.co/datasets/lance-format/fashion-mnist-lance) | zalando-datasets/fashion_mnist | train · test | CLIP IVF_PQ + BTREE/BITMAP | ✅ |
 | `imagenet1k_val/` | [`lance-format/imagenet-1k-val-lance`](https://huggingface.co/datasets/lance-format/imagenet-1k-val-lance) | benjamin-paine/imagenet-1k (val) | validation | CLIP IVF_PQ + BTREE/BITMAP | ✅ |
-| `eurosat/` | [`lance-format/eurosat-lance`](https://huggingface.co/datasets/lance-format/eurosat-lance) | blanchon/EuroSAT_RGB | train · val · test | CLIP IVF_PQ + BTREE/BITMAP | ⏳ |
+| `eurosat/` | [`lance-format/eurosat-lance`](https://huggingface.co/datasets/lance-format/eurosat-lance) | blanchon/EuroSAT_RGB | train · val · test | CLIP IVF_PQ + BTREE/BITMAP | ✅ |
 
 ## Object detection
 
 | Folder | Repo | Source | Splits | Indices | Status |
 |---|---|---|---|---|---|
-| `coco_detection_2017/` | [`lance-format/coco-detection-2017-lance`](https://huggingface.co/datasets/lance-format/coco-detection-2017-lance) | rafaelpadilla/coco2017 + COCO instances annotations | train (118k) · val (5k) | CLIP IVF_PQ + BITMAP on `categories_present` | ⏳ |
-| `kitti/` | [`lance-format/kitti-2d-detection-lance`](https://huggingface.co/datasets/lance-format/kitti-2d-detection-lance) | cvlibs.net/kitti (custom download) | train (7,481) | CLIP IVF_PQ + BITMAP on `categories_present` | ⏳ |
+| `coco_detection_2017/` | [`lance-format/coco-detection-2017-lance`](https://huggingface.co/datasets/lance-format/coco-detection-2017-lance) | detection-datasets/coco | train (117k) · val (5k) | CLIP IVF_PQ + BTREE + LABEL_LIST on `categories_present` | ✅ |
+| `kitti/` | [`lance-format/kitti-2d-detection-lance`](https://huggingface.co/datasets/lance-format/kitti-2d-detection-lance) | nateraw/kitti | train (7,481) | CLIP IVF_PQ + BTREE + LABEL_LIST on `types_present` | ✅ |
 
 ## Semantic / instance segmentation
 
 | Folder | Repo | Source | Splits | Indices | Status |
 |---|---|---|---|---|---|
 | `pascal_voc_2012/` | [`lance-format/pascal-voc-2012-segmentation-lance`](https://huggingface.co/datasets/lance-format/pascal-voc-2012-segmentation-lance) | nateraw/pascal-voc-2012 | train · validation | CLIP IVF_PQ | ✅ |
-| `ade20k/` | [`lance-format/ade20k-lance`](https://huggingface.co/datasets/lance-format/ade20k-lance) | zhoubolei/scene_parse_150 | train · validation | CLIP IVF_PQ + BITMAP on `classes_present` | ⏳ |
+| `ade20k/` | [`lance-format/ade20k-lance`](https://huggingface.co/datasets/lance-format/ade20k-lance) | 1aurent/ADE20K | train (25,574) · validation (2,000) | CLIP IVF_PQ + BTREE + LABEL_LIST on `objects_present` | ✅ |
 
 ## Image captioning / vision-language
 
@@ -44,7 +44,7 @@ Status legend: ✅ live · 🟡 in flight · ⏳ queued · ⛔ skipped (with rea
 
 | Folder | Repo | Source | Splits | Indices | Status |
 |---|---|---|---|---|---|
-| `vqav2/` | [`lance-format/vqav2-lance`](https://huggingface.co/datasets/lance-format/vqav2-lance) | HuggingFaceM4/VQAv2 | train (444k) · validation (214k) | CLIP image emb · MiniLM question emb · IVF_PQ on both · FTS on question · BITMAP on answer/question type | ⏳ |
+| `vqav2/` | [`lance-format/vqav2-lance`](https://huggingface.co/datasets/lance-format/vqav2-lance) | lmms-lab/VQAv2 | validation (214,354) | CLIP image emb + CLIP text emb on question · IVF_PQ on both · FTS on question · BTREE on ids · BITMAP on answer/question type | ✅ (val only — train deferred, see card) |
 
 ## Question answering / retrieval (text-only)
 
@@ -59,7 +59,7 @@ Status legend: ✅ live · 🟡 in flight · ⏳ queued · ⛔ skipped (with rea
 | Folder | Repo | Source | Splits | Indices | Status |
 |---|---|---|---|---|---|
 | `lerobot/xvla-soft-fold/` | [`lance-format/lerobot-xvla-soft-fold`](https://huggingface.co/datasets/lance-format/lerobot-xvla-soft-fold) | LeRobot v3.0 | frames · videos · episodes | per-camera blob + episode segments | ✅ (existing) |
-| `lerobot/pusht/` | [`lance-format/lerobot-pusht-lance`](https://huggingface.co/datasets/lance-format/lerobot-pusht-lance) | lerobot/pusht | frames · videos · episodes | per-camera blob + episode segments | ⏳ |
+| `lerobot/pusht/` | [`lance-format/lerobot-pusht-lance`](https://huggingface.co/datasets/lance-format/lerobot-pusht-lance) | lerobot/pusht | frames (25,650) · videos (1) · episodes (206) | per-camera blob + episode segments | ✅ |
 
 ## Already on the Hub (existing converters)
 

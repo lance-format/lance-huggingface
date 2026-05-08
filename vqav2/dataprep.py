@@ -166,7 +166,11 @@ def main() -> None:
     p.add_argument("--no-index", action="store_true")
     p.add_argument("--push", action="store_true")
     p.add_argument("--repo-id", default=HF_REPO_ID)
-    p.add_argument("--splits", nargs="*", default=["validation", "train"])
+    # ``lmms-lab/VQAv2`` declares only ``validation`` / ``testdev`` / ``test``
+    # in its dataset_info even though train parquet shards are present, so
+    # ``datasets.load_dataset(..., split="train")`` fails. We bundle the
+    # validation split (214k rows) and leave train as a follow-up.
+    p.add_argument("--splits", nargs="*", default=["validation"])
     args = p.parse_args()
 
     from datasets import load_dataset
