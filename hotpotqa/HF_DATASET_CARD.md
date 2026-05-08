@@ -1,0 +1,103 @@
+---
+license: cc-by-sa-4.0
+task_categories:
+- question-answering
+- text-retrieval
+language:
+- en
+tags:
+- hotpotqa
+- multi-hop-qa
+- reasoning
+- lance
+- sentence-transformers
+pretty_name: hotpotqa-distractor-lance
+size_categories:
+- 10K<n<100K
+---
+# HotpotQA distractor (Lance Format)
+
+Lance-formatted version of [HotpotQA](https://hotpotqa.github.io/) — multi-hop reading-comprehension questions where each answer requires combining facts from two Wikipedia paragraphs — using the `distractor` config (10 candidate paragraphs per question, including gold + 8 distractors). Sourced from [`hotpot_qa`](https://huggingface.co/datasets/hotpot_qa).
+
+## Splits
+
+| Split | Rows |
+|-------|------|
+| `train.lance` | 90,447 |
+| `validation.lance` | 7,405 |
+
+## Schema
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `string` | HotpotQA question id |
+| `question` | `string` | The question |
+| `answer` | `string` | Reference short answer (yes / no / span) |
+| `type` | `string?` | `bridge` or `comparison` |
+| `level` | `string?` | `easy` / `medium` / `hard` |
+| `supporting_titles` | `list<string>` | Wikipedia titles that contain gold facts |
+| `supporting_sent_ids` | `list<int32>` | Sentence indices into those titles |
+| `context_titles` | `list<string>` | All 10 paragraph titles (gold + distractors) |
+| `context_sentences` | `list<list<string>>` | Sentences per paragraph |
+| `context_text` | `string` | Flattened paragraphs — feeds the FTS index |
+| `num_supporting_facts` | `int32` | Number of gold supporting facts |
+| `question_emb` | `fixed_size_list<float32, 384>` | sentence-transformers `all-MiniLM-L6-v2` (cosine-normalized) |
+
+## Pre-built indices
+
+- `IVF_PQ` on `question_emb` — `metric=cosine`
+- `INVERTED` (FTS) on `question` and `context_text`
+- `BTREE` on `id`, `answer`
+- `BITMAP` on `type`, `level`
+
+## Quick start
+
+```python
+import lance
+ds = lance.dataset("hf://datasets/lance-format/hotpotqa-distractor-lance/data/validation.lance")
+print(ds.count_rows(), ds.schema.names, ds.list_indices())
+```
+
+## Multi-hop semantic search
+
+```python
+import lance, pyarrow as pa
+from sentence_transformers import SentenceTransformer
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+q = encoder.encode(["which actor played in both inception and dunkirk"], normalize_embeddings=True)[0]
+
+ds = lance.dataset("hf://datasets/lance-format/hotpotqa-distractor-lance/data/train.lance")
+emb_field = ds.schema.field("question_emb")
+hits = ds.scanner(
+    nearest={"column": "question_emb", "q": pa.array([q.tolist()], type=emb_field.type)[0], "k": 5},
+    columns=["question", "answer", "supporting_titles"],
+).to_table().to_pylist()
+```
+
+## Filter by question type
+
+```python
+import lance
+ds = lance.dataset("hf://datasets/lance-format/hotpotqa-distractor-lance/data/validation.lance")
+hard_compare = ds.scanner(
+    filter="type = 'comparison' AND level = 'hard'",
+    columns=["question", "answer"],
+    limit=10,
+).to_table()
+```
+
+## Source & license
+
+Converted from [`hotpot_qa`](https://huggingface.co/datasets/hotpot_qa) (`distractor` config). HotpotQA is released under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+
+## Citation
+
+```
+@inproceedings{yang2018hotpotqa,
+  title={HotpotQA: A Dataset for Diverse, Explainable Multi-hop Question Answering},
+  author={Yang, Zhilin and Qi, Peng and Zhang, Saizheng and Bengio, Yoshua and Cohen, William W. and Salakhutdinov, Ruslan and Manning, Christopher D.},
+  booktitle={Empirical Methods in Natural Language Processing (EMNLP)},
+  year={2018}
+}
+```
