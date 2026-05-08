@@ -115,7 +115,7 @@ def index_split(out_path: Path) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Pascal VOC 2012 segmentation -> Lance")
-    p.add_argument("--out", default=str(REPO_ROOT.parent / "lance_cache" / "pascal-voc-2012-lance"))
+    p.add_argument("--out", default=str(REPO_ROOT.parent / "lance_cache" / "pascal-voc-2012-segmentation-lance"))
     p.add_argument("--overwrite", action="store_true")
     p.add_argument("--no-index", action="store_true")
     p.add_argument("--push", action="store_true")
