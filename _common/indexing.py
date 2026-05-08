@@ -105,6 +105,12 @@ def create_bitmap(dataset, column: str, *, replace: bool = True) -> None:
     dataset.create_scalar_index(column, index_type="BITMAP", replace=replace)
 
 
+def create_label_list(dataset, column: str, *, replace: bool = True) -> None:
+    """Index for `list<T>` columns, supports `array_has_any` / `array_has_all`."""
+    print(f"  LABEL_LIST index on {column}")
+    dataset.create_scalar_index(column, index_type="LABEL_LIST", replace=replace)
+
+
 def build_default_indices(
     dataset,
     *,
@@ -112,6 +118,7 @@ def build_default_indices(
     fts_columns: Iterable[str] = (),
     btree_columns: Iterable[str] = (),
     bitmap_columns: Iterable[str] = (),
+    label_list_columns: Iterable[str] = (),
     metric: str = "cosine",
 ) -> None:
     """One-shot helper to build all indices for a freshly written dataset."""
@@ -123,3 +130,5 @@ def build_default_indices(
         create_btree(dataset, col)
     for col in bitmap_columns:
         create_bitmap(dataset, col)
+    for col in label_list_columns:
+        create_label_list(dataset, col)
