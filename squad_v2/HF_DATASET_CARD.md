@@ -1,0 +1,122 @@
+---
+license: cc-by-sa-4.0
+task_categories:
+- question-answering
+- text-retrieval
+language:
+- en
+tags:
+- squad
+- squad-v2
+- reading-comprehension
+- lance
+- sentence-transformers
+pretty_name: squad-v2-lance
+size_categories:
+- 100K<n<1M
+---
+# SQuAD v2 (Lance Format)
+
+Lance-formatted version of [SQuAD v2](https://huggingface.co/datasets/rajpurkar/squad_v2) — Stanford Question Answering Dataset, version 2 — with **MiniLM sentence embeddings** stored inline alongside the questions, contexts, and answers.
+
+## Why this version?
+
+- **One self-contained Lance dataset** with 130k+ Wikipedia-grounded questions and reference answers.
+- **Pre-computed text embeddings** (`sentence-transformers/all-MiniLM-L6-v2`, 384-dim, L2-normalized) on the question column with an `IVF_PQ` index — instant semantic question retrieval.
+- **Full-text inverted indices** on both `question` and `context` for keyword search.
+- **BITMAP** on `is_impossible` for fast filtering between answerable and unanswerable questions.
+
+## Splits
+
+| Split | Rows |
+|-------|------|
+| `train.lance`      | 130,319 |
+| `validation.lance` | 11,873 |
+
+## Schema
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `string` | SQuAD question id |
+| `title` | `string` | Wikipedia article title |
+| `context` | `string` | Paragraph the question was generated from |
+| `question` | `string` | The question text |
+| `answers` | `list<string>` | Accepted answer spans (empty for impossible questions) |
+| `answer_starts` | `list<int32>` | Character offsets of each answer within `context` |
+| `is_impossible` | `bool` | `true` for SQuAD 2.0 unanswerable questions |
+| `question_emb` | `fixed_size_list<float32, 384>` | MiniLM embedding of `question` (cosine-normalized) |
+
+## Pre-built indices
+
+- `IVF_PQ` on `question_emb` — `metric=cosine`
+- `INVERTED` on `question` and `context`
+- `BTREE` on `id` and `title`
+- `BITMAP` on `is_impossible`
+
+## Quick start
+
+```python
+import lance
+
+ds = lance.dataset("hf://datasets/lance-format/squad-v2-lance/data/validation.lance")
+print(ds.count_rows(), ds.schema.names, ds.list_indices())
+```
+
+## Semantic question retrieval
+
+```python
+import lance
+import pyarrow as pa
+from sentence_transformers import SentenceTransformer
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+q_vec = encoder.encode(["what year was the eiffel tower built?"], normalize_embeddings=True)[0]
+
+ds = lance.dataset("hf://datasets/lance-format/squad-v2-lance/data/train.lance")
+emb_field = ds.schema.field("question_emb")
+query = pa.array([q_vec.tolist()], type=emb_field.type)
+
+hits = ds.scanner(
+    nearest={"column": "question_emb", "q": query[0], "k": 10, "nprobes": 16, "refine_factor": 30},
+    columns=["id", "title", "question", "answers"],
+).to_table().to_pylist()
+```
+
+## Full-text search on contexts
+
+```python
+ds = lance.dataset("hf://datasets/lance-format/squad-v2-lance/data/train.lance")
+hits = ds.scanner(
+    full_text_query="great pyramid of giza",
+    columns=["title", "question", "context"],
+    limit=5,
+).to_table().to_pylist()
+```
+
+## Filter answerable vs impossible questions
+
+```python
+ds = lance.dataset("hf://datasets/lance-format/squad-v2-lance/data/validation.lance")
+impossible = ds.scanner(filter="is_impossible = true", columns=["question"], limit=5).to_table()
+```
+
+## Why Lance?
+
+- One dataset carries questions + contexts + answers + embeddings + indices — no sidecar files.
+- On-disk vector and full-text indices live next to the data, so search works on local copies and on the Hub.
+- Schema evolution: add columns (alternate embeddings, model predictions, task labels) without rewriting the data.
+
+## Source & license
+
+Converted from [`rajpurkar/squad_v2`](https://huggingface.co/datasets/rajpurkar/squad_v2). SQuAD v2 is released under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+
+## Citation
+
+```
+@article{rajpurkar2018know,
+  title={Know What You Don't Know: Unanswerable Questions for SQuAD},
+  author={Rajpurkar, Pranav and Jia, Robin and Liang, Percy},
+  journal={Proceedings of the 56th Annual Meeting of the Association for Computational Linguistics (Short Papers)},
+  year={2018},
+}
+```

@@ -1,0 +1,95 @@
+---
+license: cc-by-4.0
+task_categories:
+- visual-question-answering
+- image-text-to-text
+language:
+- en
+tags:
+- gqa
+- compositional-vqa
+- vqa
+- vision-language
+- lance
+- clip-embeddings
+pretty_name: gqa-testdev-balanced-lance
+size_categories:
+- 10K<n<100K
+---
+# GQA testdev-balanced (Lance Format)
+
+Lance-formatted version of the canonical GQA `testdev_balanced` slice — 12,578 compositional VQA questions joined with the matching 398 images — sourced from [`lmms-lab/GQA`](https://huggingface.co/datasets/lmms-lab/GQA).
+
+`lmms-lab/GQA` exposes instructions and images as **separate parquet configs**; this Lance dataset joins them on `imageId`, so each row has the question, the answer, the GQA reasoning-program tags, *and* the image bytes inline.
+
+## Splits
+
+| Split | Rows | Distinct images |
+|-------|------|----------------|
+| `testdev.lance` | 12,578 | 398 |
+
+> Train (`train_balanced_instructions` × `train_balanced_images`, ~943k Q's × 72k images, ~10 GB images) and val splits are not bundled by default — pass `--instr-config`/`--images-config` to `gqa/dataprep.py` to extend.
+
+## Schema
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `int64` | Row index |
+| `image` | `large_binary` | Inline JPEG bytes (image is duplicated across rows that share an `image_id`) |
+| `image_id` | `string` | GQA scene-graph image id |
+| `question_id` | `string` | GQA question id |
+| `question` | `string` | Compositional natural-language question |
+| `answers` | `list<string>` | One-element list (the GQA short answer) |
+| `answer` | `string` | Same short answer (canonical / FTS target) |
+| `full_answer` | `string?` | Full sentence answer |
+| `structural` | `string?` | One of `verify`, `query`, `compare`, `choose`, `logical` |
+| `semantic` | `string?` | One of `attr`, `cat`, `global`, `obj`, `rel` |
+| `detailed` | `string?` | Fine-grained type (e.g. `weatherVerifyC`) |
+| `is_balanced` | `bool` | GQA balanced subset flag |
+| `group_global` / `group_local` | `string?` | GQA reasoning-group ids |
+| `semantic_str` | `string?` | Compact description of the reasoning program |
+| `image_emb` | `fixed_size_list<float32, 512>` | CLIP image embedding (cosine-normalized) |
+| `question_emb` | `fixed_size_list<float32, 512>` | CLIP text embedding of the question |
+
+## Pre-built indices
+
+- `IVF_PQ` on `image_emb` and `question_emb` — `metric=cosine`
+- `INVERTED` (FTS) on `question` and `answer`
+- `BITMAP` on `structural`, `semantic`, `detailed`
+- `BTREE` on `image_id`, `question_id`
+
+## Quick start
+
+```python
+import lance
+ds = lance.dataset("hf://datasets/lance-format/gqa-testdev-balanced-lance/data/testdev.lance")
+print(ds.count_rows(), ds.schema.names, ds.list_indices())
+```
+
+## Filter by reasoning type
+
+```python
+import lance
+ds = lance.dataset("hf://datasets/lance-format/gqa-testdev-balanced-lance/data/testdev.lance")
+verify_qs = ds.scanner(filter="structural = 'verify'", columns=["question", "answer"], limit=5).to_table()
+```
+
+## Why Lance?
+
+- One dataset for the joined image + question + answer + reasoning-program metadata + dual embeddings + indices — no instructions/images parquet split to keep in sync.
+- Schema evolution: add columns (alternate scene graphs, model predictions) without rewriting the data.
+
+## Source & license
+
+Converted from [`lmms-lab/GQA`](https://huggingface.co/datasets/lmms-lab/GQA). GQA is released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) by Hudson and Manning (Stanford NLP).
+
+## Citation
+
+```
+@inproceedings{hudson2019gqa,
+  title={GQA: A New Dataset for Real-World Visual Reasoning and Compositional Question Answering},
+  author={Hudson, Drew A. and Manning, Christopher D.},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year={2019}
+}
+```

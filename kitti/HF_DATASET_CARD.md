@@ -1,0 +1,139 @@
+---
+license: cc-by-nc-sa-3.0
+task_categories:
+- object-detection
+- image-feature-extraction
+language:
+- en
+tags:
+- kitti
+- autonomous-driving
+- 2d-detection
+- 3d-detection
+- lance
+- clip-embeddings
+pretty_name: kitti-2d-detection-lance
+size_categories:
+- 1K<n<10K
+---
+# KITTI 2D Object Detection (Lance Format)
+
+Lance-formatted version of the [KITTI 2D Object Detection benchmark](https://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=2d) — 7,481 training images from the KITTI Vision Benchmark Suite with 2D bounding boxes plus the full 3D-box / observation-angle metadata. Sourced from [`nateraw/kitti`](https://huggingface.co/datasets/nateraw/kitti) so no manual signup or download from cvlibs.net is required.
+
+KITTI is the canonical autonomous-driving 2D / 3D detection benchmark — useful for AV perception research, robust real-world benchmarking, and as a small-scale companion to nuScenes / Waymo.
+
+## Splits
+
+| Split | Rows |
+|-------|------|
+| `train.lance` | 7,481 |
+
+(The `test` split has no labels published, so we omit it. Add it back via `--splits train test` if you want the unlabeled images as well.)
+
+## Schema
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `int64` | Row index within split |
+| `image` | `large_binary` | Inline JPEG bytes (re-encoded from the source PNG) |
+| `bboxes` | `list<list<float32, 4>>` | 2D box per object — `[left, top, right, bottom]` in pixel coords |
+| `alphas` | `list<float32>` | Observation angle (radians, KITTI convention) |
+| `dimensions` | `list<list<float32, 3>>` | 3D box `(h, w, l)` in metres |
+| `locations` | `list<list<float32, 3>>` | 3D centre `(x, y, z)` in camera coords (metres) |
+| `rotation_y` | `list<float32>` | Yaw angle in camera coords (radians) |
+| `occluded` | `list<int8>` | KITTI occlusion flag (0=visible, 1=partly, 2=largely, 3=unknown) |
+| `truncated` | `list<float32>` | Truncation fraction (0.0-1.0) |
+| `types` | `list<string>` | Class name per object (e.g. `Car`, `Pedestrian`, `Cyclist`, `DontCare`) |
+| `num_objects` | `int32` | Number of annotated objects |
+| `types_present` | `list<string>` | Deduped class names — feeds the LABEL_LIST index |
+| `image_emb` | `fixed_size_list<float32, 512>` | OpenCLIP `ViT-B-32` image embedding (cosine-normalized) |
+
+## Pre-built indices
+
+- `IVF_PQ` on `image_emb` — `metric=cosine`
+- `BTREE` on `num_objects`
+- `LABEL_LIST` on `types_present`
+
+## Quick start
+
+```python
+import lance
+
+ds = lance.dataset("hf://datasets/lance-format/kitti-2d-detection-lance/data/train.lance")
+print(ds.count_rows(), ds.schema.names, ds.list_indices())
+```
+
+## Read a frame with annotations
+
+```python
+import io
+import lance
+from PIL import Image, ImageDraw
+
+ds = lance.dataset("hf://datasets/lance-format/kitti-2d-detection-lance/data/train.lance")
+row = ds.take([0], columns=["image", "bboxes", "types"]).to_pylist()[0]
+
+img = Image.open(io.BytesIO(row["image"])).convert("RGB")
+draw = ImageDraw.Draw(img)
+for (l, t, r, b), cls in zip(row["bboxes"], row["types"]):
+    if cls == "DontCare":
+        continue
+    draw.rectangle([l, t, r, b], outline="lime", width=2)
+    draw.text((l + 4, t + 2), cls, fill="lime")
+img.save("kitti.jpg")
+```
+
+## Filter by classes
+
+```python
+import lance
+ds = lance.dataset("hf://datasets/lance-format/kitti-2d-detection-lance/data/train.lance")
+
+# Frames containing both a Car and a Cyclist (LABEL_LIST index makes this fast).
+both = ds.scanner(
+    filter="array_has_all(types_present, ['Car', 'Cyclist'])",
+    columns=["id", "types_present"],
+    limit=10,
+).to_table()
+
+# Frames with at least 10 objects (for crowded-scene experiments).
+crowded = ds.scanner(filter="num_objects >= 10", columns=["id"], limit=10).to_table()
+```
+
+## Visual similarity search
+
+```python
+import lance
+import pyarrow as pa
+
+ds = lance.dataset("hf://datasets/lance-format/kitti-2d-detection-lance/data/train.lance")
+emb_field = ds.schema.field("image_emb")
+ref = ds.take([0], columns=["image_emb"]).to_pylist()[0]["image_emb"]
+query = pa.array([ref], type=emb_field.type)
+
+neighbors = ds.scanner(
+    nearest={"column": "image_emb", "q": query[0], "k": 5, "nprobes": 16, "refine_factor": 30},
+    columns=["id", "types_present"],
+).to_table().to_pylist()
+```
+
+## Why Lance?
+
+- One dataset for images + 2D + 3D annotations + embeddings + indices — no parallel `image_2/` and `label_2/` folders.
+- On-disk vector and label-list indices live next to the data, so search and class-based filtering work on local copies and on the Hub.
+- Schema evolution: add columns (LIDAR features, alternative embeddings, model predictions) without rewriting the data.
+
+## Source & license
+
+Converted from [`nateraw/kitti`](https://huggingface.co/datasets/nateraw/kitti). KITTI is released under the [CC BY-NC-SA 3.0 license](https://creativecommons.org/licenses/by-nc-sa/3.0/) by Karlsruhe Institute of Technology and Toyota Technological Institute at Chicago — **non-commercial research use only**. See the [KITTI license page](https://www.cvlibs.net/datasets/kitti/) for details.
+
+## Citation
+
+```
+@inproceedings{geiger2012are,
+  title={Are we ready for autonomous driving? The KITTI vision benchmark suite},
+  author={Geiger, Andreas and Lenz, Philip and Urtasun, Raquel},
+  booktitle={IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year={2012}
+}
+```

@@ -1,0 +1,103 @@
+---
+license: cc-by-4.0
+task_categories:
+- visual-question-answering
+- image-text-to-text
+- image-feature-extraction
+language:
+- en
+tags:
+- textvqa
+- ocr
+- vqa
+- vision-language
+- lance
+- clip-embeddings
+pretty_name: textvqa-lance
+size_categories:
+- 10K<n<100K
+---
+# TextVQA (Lance Format)
+
+Lance-formatted version of [TextVQA](https://textvqa.org/) — VQA where the question requires *reading* text in the image — sourced from [`lmms-lab/textvqa`](https://huggingface.co/datasets/lmms-lab/textvqa).
+
+Each row carries the image bytes, the question, the 10 reference answers, the OCR tokens detected by the dataset's pre-processing, and CLIP image + question embeddings.
+
+## Splits
+
+| Split | Rows |
+|-------|------|
+| `validation.lance` | 5,000 |
+| `train.lance`      | 34,602 |
+
+## Schema
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `int64` | Row index within split |
+| `image` | `large_binary` | Inline JPEG bytes |
+| `image_id` | `string?` | TextVQA image id |
+| `question_id` | `string?` | TextVQA question id |
+| `question` | `string` | The question text |
+| `answers` | `list<string>` | 10 annotator answers |
+| `answer` | `string` | First answer — used as canonical / FTS target |
+| `ocr_tokens` | `list<string>` | OCR tokens detected on the image |
+| `image_classes` | `list<string>` | OpenImages-style scene tags from the source |
+| `set_name` | `string?` | Source partition (`train`, `val`) |
+| `image_emb` | `fixed_size_list<float32, 512>` | OpenCLIP image embedding (cosine-normalized) |
+| `question_emb` | `fixed_size_list<float32, 512>` | OpenCLIP text embedding of the question |
+
+## Pre-built indices
+
+- `IVF_PQ` on `image_emb` and `question_emb` — `metric=cosine`
+- `INVERTED` (FTS) on `question` and `answer`
+- `BTREE` on `image_id`, `question_id`, `set_name`
+
+## Quick start
+
+```python
+import lance
+ds = lance.dataset("hf://datasets/lance-format/textvqa-lance/data/validation.lance")
+print(ds.count_rows(), ds.schema.names, ds.list_indices())
+```
+
+## Cross-modal text→image search
+
+```python
+import lance, pyarrow as pa, open_clip, torch
+
+model, _, _ = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
+tokenizer = open_clip.get_tokenizer("ViT-B-32")
+model = model.eval().cuda().half()
+with torch.no_grad():
+    q = model.encode_text(tokenizer(["what brand is on this billboard?"]).cuda())
+    q = (q / q.norm(dim=-1, keepdim=True)).float().cpu().numpy()[0]
+
+ds = lance.dataset("hf://datasets/lance-format/textvqa-lance/data/validation.lance")
+emb_field = ds.schema.field("image_emb")
+hits = ds.scanner(
+    nearest={"column": "image_emb", "q": pa.array([q.tolist()], type=emb_field.type)[0], "k": 10},
+    columns=["question", "answer", "ocr_tokens"],
+).to_table().to_pylist()
+```
+
+## Why Lance?
+
+- One dataset for images + questions + answers + OCR + dual embeddings + indices — no JSON/feature folders.
+- Cross-modal search and OCR-text filtering work on the same dataset on the Hub.
+- Schema evolution: add columns (alternate OCR systems, model predictions) without rewriting the data.
+
+## Source & license
+
+Converted from [`lmms-lab/textvqa`](https://huggingface.co/datasets/lmms-lab/textvqa). TextVQA is released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) by Singh et al. (Facebook AI Research).
+
+## Citation
+
+```
+@inproceedings{singh2019towards,
+  title={Towards VQA models that can read},
+  author={Singh, Amanpreet and Natarajan, Vivek and Shah, Meet and Jiang, Yu and Chen, Xinlei and Batra, Dhruv and Parikh, Devi and Rohrbach, Marcus},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year={2019}
+}
+```
