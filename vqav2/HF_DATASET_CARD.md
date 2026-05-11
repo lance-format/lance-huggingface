@@ -69,6 +69,18 @@ ds = lance.dataset("hf://datasets/lance-format/vqav2-lance/data/validation.lance
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/vqav2-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} image-question pairs")
+```
+
 ## Cross-modal: find an image for a free-form question
 
 ```python
@@ -92,6 +104,30 @@ hits = ds.scanner(
 ).to_table().to_pylist()
 ```
 
+### LanceDB cross-modal search
+
+```python
+import lancedb, open_clip, torch
+
+model, _, _ = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
+tokenizer = open_clip.get_tokenizer("ViT-B-32")
+model = model.eval().cuda().half()
+with torch.no_grad():
+    q = model.encode_text(tokenizer(["what color is the dog?"]).cuda())
+    q = (q / q.norm(dim=-1, keepdim=True)).float().cpu().numpy()[0]
+
+db = lancedb.connect("hf://datasets/lance-format/vqav2-lance/data")
+tbl = db.open_table("validation")
+
+results = (
+    tbl.search(q.tolist(), vector_column_name="image_emb")
+    .metric("cosine")
+    .select(["image_id", "question", "multiple_choice_answer"])
+    .limit(5)
+    .to_list()
+)
+```
+
 ## Question similarity (text→text)
 
 ```python
@@ -107,12 +143,55 @@ for n in neighbors:
     print(n)
 ```
 
+### LanceDB question similarity
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/vqav2-lance/data")
+tbl = db.open_table("validation")
+
+ref = tbl.search().limit(1).select(["question_emb", "question"]).to_list()[0]
+query_embedding = ref["question_emb"]
+
+results = (
+    tbl.search(query_embedding, vector_column_name="question_emb")
+    .metric("cosine")
+    .select(["question", "multiple_choice_answer"])
+    .limit(5)
+    .to_list()
+)
+```
+
 ## Filter by question / answer type
 
 ```python
 ds = lance.dataset("hf://datasets/lance-format/vqav2-lance/data/validation.lance")
 yesno = ds.scanner(filter="answer_type = 'yes/no'", columns=["question", "multiple_choice_answer"], limit=5).to_table()
 counts = ds.scanner(filter="answer_type = 'number'", columns=["question", "multiple_choice_answer"], limit=5).to_table()
+```
+
+### Filter with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/vqav2-lance/data")
+tbl = db.open_table("validation")
+yesno = (
+    tbl.search()
+    .where("answer_type = 'yes/no'")
+    .select(["question", "multiple_choice_answer"])
+    .limit(5)
+    .to_list()
+)
+counts = (
+    tbl.search()
+    .where("answer_type = 'number'")
+    .select(["question", "multiple_choice_answer"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Why Lance?

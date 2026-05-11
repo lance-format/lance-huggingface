@@ -60,6 +60,18 @@ ds = lance.dataset("hf://datasets/lance-format/flickr30k-lance/data/train.lance"
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/flickr30k-lance/data")
+tbl = db.open_table("train")
+print(f"LanceDB table opened with {len(tbl)} image-caption pairs")
+```
+
 ## Cross-modal text→image search
 
 ```python
@@ -89,6 +101,30 @@ for h in hits:
     print(h)
 ```
 
+### LanceDB cross-modal text→image search
+
+```python
+import lancedb, open_clip, torch
+
+model, _, _ = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
+tokenizer = open_clip.get_tokenizer("ViT-B-32")
+model = model.eval().cuda().half()
+with torch.no_grad():
+    q = model.encode_text(tokenizer(["a man surfing at sunset"]).cuda())
+    q = (q / q.norm(dim=-1, keepdim=True)).float().cpu().numpy()[0]
+
+db = lancedb.connect("hf://datasets/lance-format/flickr30k-lance/data")
+tbl = db.open_table("train")
+
+results = (
+    tbl.search(q.tolist(), vector_column_name="image_emb")
+    .metric("cosine")
+    .select(["image_id", "caption"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Image→caption (image-to-text retrieval)
 
 ```python
@@ -102,6 +138,26 @@ neighbors = ds.scanner(
 ).to_table().to_pylist()
 ```
 
+### LanceDB image→caption search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/flickr30k-lance/data")
+tbl = db.open_table("train")
+
+ref = tbl.search().limit(1).select(["image_emb", "caption"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding, vector_column_name="text_emb")
+    .metric("cosine")
+    .select(["caption"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Full-text search on captions
 
 ```python
@@ -112,6 +168,22 @@ hits = ds.scanner(
     columns=["image_id", "caption"],
     limit=10,
 ).to_table().to_pylist()
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/flickr30k-lance/data")
+tbl = db.open_table("train")
+
+results = (
+    tbl.search("dog playing in the snow")
+    .select(["image_id", "caption"])
+    .limit(10)
+    .to_list()
+)
 ```
 
 ## Working with images

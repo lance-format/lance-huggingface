@@ -64,6 +64,18 @@ ds = lance.dataset("hf://datasets/lance-format/ms-marco-v2.1-lance/data/validati
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/ms-marco-v2.1-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} queries")
+```
+
 ## Semantic query lookup
 
 ```python
@@ -85,6 +97,43 @@ for h in hits:
     print("  selected:", (h.get("selected_passage") or "")[:120])
 ```
 
+### LanceDB semantic query lookup
+
+```python
+import lancedb
+from sentence_transformers import SentenceTransformer
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+q = encoder.encode(["how to compute determinant of a 3x3 matrix"], normalize_embeddings=True)[0]
+
+db = lancedb.connect("hf://datasets/lance-format/ms-marco-v2.1-lance/data")
+tbl = db.open_table("validation")
+
+results = (
+    tbl.search(q.tolist(), vector_column_name="query_emb")
+    .metric("cosine")
+    .select(["query_id", "query", "selected_passage", "answers"])
+    .limit(5)
+    .to_list()
+)
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/ms-marco-v2.1-lance/data")
+tbl = db.open_table("validation")
+
+results = (
+    tbl.search("determinant matrix")
+    .select(["query", "selected_passage"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Get all candidate passages for a query
 
 ```python
@@ -100,6 +149,22 @@ for text, sel in zip(row["passage_text"], row["passage_is_selected"]):
 ```python
 ds = lance.dataset("hf://datasets/lance-format/ms-marco-v2.1-lance/data/train.lance")
 numeric = ds.scanner(filter="query_type = 'NUMERIC'", columns=["query"], limit=5).to_table()
+```
+
+### Filter by query_type with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/ms-marco-v2.1-lance/data")
+tbl = db.open_table("train")
+numeric = (
+    tbl.search()
+    .where("query_type = 'NUMERIC'")
+    .select(["query"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Why Lance?

@@ -58,6 +58,18 @@ ds = lance.dataset("hf://datasets/lance-format/trivia-qa-lance/data/train.lance"
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/trivia-qa-lance/data")
+tbl = db.open_table("train")
+print(f"LanceDB table opened with {len(tbl)} trivia questions")
+```
+
 ## Semantic search over questions
 
 ```python
@@ -76,11 +88,64 @@ hits = ds.scanner(
 ).to_table().to_pylist()
 ```
 
+### LanceDB semantic search
+
+```python
+import lancedb
+from sentence_transformers import SentenceTransformer
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+q = encoder.encode(["who painted the sistine chapel ceiling"], normalize_embeddings=True)[0]
+
+db = lancedb.connect("hf://datasets/lance-format/trivia-qa-lance/data")
+tbl = db.open_table("train")
+
+results = (
+    tbl.search(q.tolist(), vector_column_name="question_emb")
+    .metric("cosine")
+    .select(["question", "answer_value", "answer_aliases"])
+    .limit(5)
+    .to_list()
+)
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/trivia-qa-lance/data")
+tbl = db.open_table("train")
+
+results = (
+    tbl.search("sistine chapel")
+    .select(["question", "answer_value"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Filter by answer type
 
 ```python
 ds = lance.dataset("hf://datasets/lance-format/trivia-qa-lance/data/train.lance")
 wiki = ds.scanner(filter="answer_type = 'WikipediaEntity'", columns=["question"], limit=5).to_table()
+```
+
+### Filter with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/trivia-qa-lance/data")
+tbl = db.open_table("train")
+wiki = (
+    tbl.search()
+    .where("answer_type = 'WikipediaEntity'")
+    .select(["question"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Why Lance?

@@ -53,7 +53,7 @@ blob_file = lance_ds.take_blobs("video_blob", ids=[0])[0]
 video_bytes = blob_file.read()
 ```
 
-These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the serverless vector database built on Lance, for simplified vector search and other queries.
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
 
 ```python
 import lancedb

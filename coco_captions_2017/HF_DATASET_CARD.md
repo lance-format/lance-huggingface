@@ -62,6 +62,18 @@ print(ds.count_rows(), ds.schema.names)
 print(ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/coco-captions-2017-lance/data")
+tbl = db.open_table("val")
+print(f"LanceDB table opened with {len(tbl)} image-caption pairs")
+```
+
 > **Tip — for production use, download locally first.**
 > ```bash
 > hf download lance-format/coco-captions-2017-lance --repo-type dataset --local-dir ./coco-captions-2017-lance
@@ -89,6 +101,30 @@ hits = ds.scanner(
 ).to_table().to_pylist()
 ```
 
+### LanceDB cross-modal text→image search
+
+```python
+import lancedb, open_clip, torch
+
+model, _, _ = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
+tokenizer = open_clip.get_tokenizer("ViT-B-32")
+model = model.eval().cuda().half()
+with torch.no_grad():
+    q = model.encode_text(tokenizer(["a giraffe eating leaves"]).cuda())
+    q = (q / q.norm(dim=-1, keepdim=True)).float().cpu().numpy()[0]
+
+db = lancedb.connect("hf://datasets/lance-format/coco-captions-2017-lance/data")
+tbl = db.open_table("val")
+
+results = (
+    tbl.search(q.tolist(), vector_column_name="image_emb")
+    .metric("cosine")
+    .select(["image_id", "caption"])
+    .limit(10)
+    .to_list()
+)
+```
+
 Full-text search:
 
 ```python
@@ -98,6 +134,22 @@ hits = ds.scanner(
     columns=["image_id", "caption"],
     limit=10,
 ).to_table().to_pylist()
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/coco-captions-2017-lance/data")
+tbl = db.open_table("val")
+
+results = (
+    tbl.search("surfer riding a wave")
+    .select(["image_id", "caption"])
+    .limit(10)
+    .to_list()
+)
 ```
 
 ## Why Lance?

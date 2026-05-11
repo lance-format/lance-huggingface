@@ -49,12 +49,34 @@ ds = lance.dataset("hf://datasets/lance-format/food101-lance/data/validation.lan
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/food101-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} images")
+```
+
 ## Filter by class
 
 ```python
 import lance
 ds = lance.dataset("hf://datasets/lance-format/food101-lance/data/validation.lance")
 sushi = ds.scanner(filter="label_name = 'sushi'", columns=["id"], limit=5).to_table()
+```
+
+### Filter by class with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/food101-lance/data")
+tbl = db.open_table("validation")
+sushi = tbl.search().where("label_name = 'sushi'").select(["id"]).limit(5).to_list()
 ```
 
 ## Visual similarity search
@@ -69,6 +91,26 @@ neighbors = ds.scanner(
     nearest={"column": "image_emb", "q": query[0], "k": 5, "nprobes": 16, "refine_factor": 30},
     columns=["id", "label_name"],
 ).to_table().to_pylist()
+```
+
+### LanceDB visual similarity search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/food101-lance/data")
+tbl = db.open_table("validation")
+
+ref = tbl.search().limit(1).select(["image_emb", "label_name"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding)
+    .metric("cosine")
+    .select(["id", "label_name"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Source & license
