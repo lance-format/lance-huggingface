@@ -56,6 +56,18 @@ ds = lance.dataset("hf://datasets/lance-format/eurosat-lance/data/train.lance")
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/eurosat-lance/data")
+tbl = db.open_table("train")
+print(f"LanceDB table opened with {len(tbl)} satellite tiles")
+```
+
 ## Visual similarity search
 
 ```python
@@ -76,12 +88,42 @@ for h in hits:
     print(h)
 ```
 
+### LanceDB visual similarity search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/eurosat-lance/data")
+tbl = db.open_table("train")
+
+ref = tbl.search().limit(1).select(["image_emb", "label_name"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding)
+    .metric("cosine")
+    .select(["id", "label_name"])
+    .limit(5)
+    .to_list()
+)
+```
+
 ## Filter by class
 
 ```python
 import lance
 ds = lance.dataset("hf://datasets/lance-format/eurosat-lance/data/train.lance")
 rivers = ds.scanner(filter="label_name = 'River'", columns=["id"], limit=5).to_table()
+```
+
+### Filter by class with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/eurosat-lance/data")
+tbl = db.open_table("train")
+rivers = tbl.search().where("label_name = 'River'").select(["id"]).limit(5).to_list()
 ```
 
 ## Why Lance?

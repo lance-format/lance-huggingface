@@ -62,6 +62,18 @@ ds = lance.dataset("hf://datasets/lance-format/squad-v2-lance/data/validation.la
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/squad-v2-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} questions")
+```
+
 ## Semantic question retrieval
 
 ```python
@@ -82,6 +94,27 @@ hits = ds.scanner(
 ).to_table().to_pylist()
 ```
 
+### LanceDB semantic question retrieval
+
+```python
+import lancedb
+from sentence_transformers import SentenceTransformer
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+q_vec = encoder.encode(["what year was the eiffel tower built?"], normalize_embeddings=True)[0]
+
+db = lancedb.connect("hf://datasets/lance-format/squad-v2-lance/data")
+tbl = db.open_table("train")
+
+results = (
+    tbl.search(q_vec.tolist(), vector_column_name="question_emb")
+    .metric("cosine")
+    .select(["id", "title", "question", "answers"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Full-text search on contexts
 
 ```python
@@ -93,11 +126,43 @@ hits = ds.scanner(
 ).to_table().to_pylist()
 ```
 
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/squad-v2-lance/data")
+tbl = db.open_table("train")
+
+results = (
+    tbl.search("great pyramid of giza")
+    .select(["title", "question", "context"])
+    .limit(5)
+    .to_list()
+)
+```
+
 ## Filter answerable vs impossible questions
 
 ```python
 ds = lance.dataset("hf://datasets/lance-format/squad-v2-lance/data/validation.lance")
 impossible = ds.scanner(filter="is_impossible = true", columns=["question"], limit=5).to_table()
+```
+
+### Filter with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/squad-v2-lance/data")
+tbl = db.open_table("validation")
+impossible = (
+    tbl.search()
+    .where("is_impossible = true")
+    .select(["question"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Why Lance?

@@ -59,6 +59,18 @@ ds = lance.dataset("hf://datasets/lance-format/librispeech-clean-lance/data/test
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries. Each `.lance` file in `data/` is a table — open by name (e.g., `test_clean`, `train_clean_100`).
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/librispeech-clean-lance/data")
+tbl = db.open_table("test_clean")
+print(f"LanceDB table opened with {len(tbl)} utterances")
+```
+
 ## Read one utterance and play it
 
 ```python
@@ -103,6 +115,27 @@ for h in hits:
     print(h)
 ```
 
+### LanceDB semantic transcript retrieval
+
+```python
+import lancedb
+from sentence_transformers import SentenceTransformer
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+q = encoder.encode(["a person talking about astronomy"], normalize_embeddings=True)[0]
+
+db = lancedb.connect("hf://datasets/lance-format/librispeech-clean-lance/data")
+tbl = db.open_table("train_clean_100")
+
+results = (
+    tbl.search(q.tolist(), vector_column_name="text_emb")
+    .metric("cosine")
+    .select(["id", "speaker_id", "text"])
+    .limit(5)
+    .to_list()
+)
+```
+
 ## Full-text and per-speaker filtering
 
 ```python
@@ -113,6 +146,32 @@ hits = ds.scanner(full_text_query="universe stars", columns=["id", "text"], limi
 
 # All utterances by a given speaker.
 sp = ds.scanner(filter="speaker_id = 1272", columns=["id", "chapter_id", "text"], limit=10).to_table()
+```
+
+### LanceDB full-text search and per-speaker filtering
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/librispeech-clean-lance/data")
+tbl = db.open_table("train_clean_100")
+
+# Word search via the FTS index.
+hits = (
+    tbl.search("universe stars")
+    .select(["id", "text"])
+    .limit(10)
+    .to_list()
+)
+
+# All utterances by a given speaker.
+sp = (
+    tbl.search()
+    .where("speaker_id = 1272")
+    .select(["id", "chapter_id", "text"])
+    .limit(10)
+    .to_list()
+)
 ```
 
 ## Why Lance?

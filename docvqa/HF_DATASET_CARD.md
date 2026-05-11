@@ -62,6 +62,54 @@ ds = lance.dataset("hf://datasets/lance-format/docvqa-lance/data/validation.lanc
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/docvqa-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} document-question pairs")
+```
+
+### LanceDB vector search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/docvqa-lance/data")
+tbl = db.open_table("validation")
+
+ref = tbl.search().limit(1).select(["question_emb", "question"]).to_list()[0]
+query_embedding = ref["question_emb"]
+
+results = (
+    tbl.search(query_embedding, vector_column_name="question_emb")
+    .metric("cosine")
+    .select(["question", "answer"])
+    .limit(5)
+    .to_list()
+)
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/docvqa-lance/data")
+tbl = db.open_table("validation")
+
+results = (
+    tbl.search("invoice total")
+    .select(["question", "answer"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Filter by question type
 
 ```python
@@ -72,6 +120,22 @@ forms = ds.scanner(
     columns=["question", "answer"],
     limit=5,
 ).to_table()
+```
+
+### Filter with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/docvqa-lance/data")
+tbl = db.open_table("validation")
+forms = (
+    tbl.search()
+    .where("array_has_any(question_types, ['form'])")
+    .select(["question", "answer"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Source & license

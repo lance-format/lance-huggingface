@@ -58,6 +58,18 @@ ds = lance.dataset("hf://datasets/lance-format/hotpotqa-distractor-lance/data/va
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/hotpotqa-distractor-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} questions")
+```
+
 ## Multi-hop semantic search
 
 ```python
@@ -75,6 +87,43 @@ hits = ds.scanner(
 ).to_table().to_pylist()
 ```
 
+### LanceDB semantic search
+
+```python
+import lancedb
+from sentence_transformers import SentenceTransformer
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+q = encoder.encode(["which actor played in both inception and dunkirk"], normalize_embeddings=True)[0]
+
+db = lancedb.connect("hf://datasets/lance-format/hotpotqa-distractor-lance/data")
+tbl = db.open_table("train")
+
+results = (
+    tbl.search(q.tolist(), vector_column_name="question_emb")
+    .metric("cosine")
+    .select(["question", "answer", "supporting_titles"])
+    .limit(5)
+    .to_list()
+)
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/hotpotqa-distractor-lance/data")
+tbl = db.open_table("train")
+
+results = (
+    tbl.search("inception dunkirk")
+    .select(["question", "answer"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Filter by question type
 
 ```python
@@ -85,6 +134,22 @@ hard_compare = ds.scanner(
     columns=["question", "answer"],
     limit=10,
 ).to_table()
+```
+
+### Filter with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/hotpotqa-distractor-lance/data")
+tbl = db.open_table("validation")
+hard_compare = (
+    tbl.search()
+    .where("type = 'comparison' AND level = 'hard'")
+    .select(["question", "answer"])
+    .limit(10)
+    .to_list()
+)
 ```
 
 ## Source & license

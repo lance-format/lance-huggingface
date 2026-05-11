@@ -98,12 +98,50 @@ neighbors = ds.scanner(
 print(neighbors)
 ```
 
+### LanceDB vector search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/cifar10-lance/data")
+tbl = db.open_table("train")
+
+ref = tbl.search().limit(1).select(["image_emb"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding)
+    .metric("cosine")
+    .select(["id", "label_name"])
+    .limit(5)
+    .to_list()
+)
+for row in results:
+    print(row["id"], row["label_name"])
+```
+
 ## Filter by class
 
 ```python
 import lance
 ds = lance.dataset("hf://datasets/lance-format/cifar10-lance/data/train.lance")
 ships = ds.scanner(filter="label_name = 'ship'", columns=["id"], limit=5).to_table()
+```
+
+### Filter by class with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/cifar10-lance/data")
+tbl = db.open_table("train")
+ships = (
+    tbl.search()
+    .where("label_name = 'ship'")
+    .select(["id"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Working with images

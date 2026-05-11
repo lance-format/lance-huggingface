@@ -57,6 +57,18 @@ ds = lance.dataset("hf://datasets/lance-format/ade20k-lance/data/validation.lanc
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/ade20k-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} scene images")
+```
+
 ## Read an image with its segmentation
 
 ```python
@@ -87,6 +99,23 @@ rows = ds.scanner(
 ).to_table().to_pylist()
 ```
 
+### Filter with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/ade20k-lance/data")
+tbl = db.open_table("validation")
+
+rows = (
+    tbl.search()
+    .where("array_has_all(objects_present, ['bed', 'window'])")
+    .select(["filename", "scene"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Visual similarity search
 
 ```python
@@ -102,6 +131,26 @@ neighbors = ds.scanner(
     nearest={"column": "image_emb", "q": query[0], "k": 5},
     columns=["filename", "scene"],
 ).to_table().to_pylist()
+```
+
+### LanceDB visual similarity search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/ade20k-lance/data")
+tbl = db.open_table("validation")
+
+ref = tbl.search().limit(1).select(["image_emb"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding)
+    .metric("cosine")
+    .select(["filename", "scene"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Why Lance?

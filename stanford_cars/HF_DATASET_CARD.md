@@ -43,12 +43,40 @@ ds = lance.dataset("hf://datasets/lance-format/stanford-cars-lance/data/train.la
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/stanford-cars-lance/data")
+tbl = db.open_table("train")
+print(f"LanceDB table opened with {len(tbl)} car images")
+```
+
 ## Caption-based filtering
 
 ```python
 import lance
 ds = lance.dataset("hf://datasets/lance-format/stanford-cars-lance/data/train.lance")
 hits = ds.scanner(full_text_query="red sports car", columns=["id", "blip_caption"], limit=10).to_table()
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/stanford-cars-lance/data")
+tbl = db.open_table("train")
+
+results = (
+    tbl.search("red sports car")
+    .select(["id", "blip_caption"])
+    .limit(10)
+    .to_list()
+)
 ```
 
 ## Visual similarity search
@@ -62,6 +90,26 @@ neighbors = ds.scanner(
     nearest={"column": "image_emb", "q": pa.array([ref["image_emb"]], type=emb_field.type)[0], "k": 5},
     columns=["id", "blip_caption"],
 ).to_table().to_pylist()
+```
+
+### LanceDB visual similarity search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/stanford-cars-lance/data")
+tbl = db.open_table("train")
+
+ref = tbl.search().limit(1).select(["image_emb", "blip_caption"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding)
+    .metric("cosine")
+    .select(["id", "blip_caption"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Source & license

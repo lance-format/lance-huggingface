@@ -59,6 +59,18 @@ ds = lance.dataset("hf://datasets/lance-format/pascal-voc-2012-segmentation-lanc
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/pascal-voc-2012-segmentation-lance/data")
+tbl = db.open_table("train")
+print(f"LanceDB table opened with {len(tbl)} image-mask pairs")
+```
+
 ## Working with images and masks
 
 ```python
@@ -92,6 +104,26 @@ neighbors = ds.scanner(
     nearest={"column": "image_emb", "q": query[0], "k": 5},
     columns=["id"],
 ).to_table().to_pylist()
+```
+
+### LanceDB vector search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/pascal-voc-2012-segmentation-lance/data")
+tbl = db.open_table("train")
+
+ref = tbl.search().limit(1).select(["image_emb"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding)
+    .metric("cosine")
+    .select(["id"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Why Lance?

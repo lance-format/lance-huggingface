@@ -61,6 +61,18 @@ ds = lance.dataset("hf://datasets/lance-format/textvqa-lance/data/validation.lan
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/textvqa-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} image-question pairs")
+```
+
 ## Cross-modal text→image search
 
 ```python
@@ -79,6 +91,46 @@ hits = ds.scanner(
     nearest={"column": "image_emb", "q": pa.array([q.tolist()], type=emb_field.type)[0], "k": 10},
     columns=["question", "answer", "ocr_tokens"],
 ).to_table().to_pylist()
+```
+
+### LanceDB cross-modal text→image search
+
+```python
+import lancedb, open_clip, torch
+
+model, _, _ = open_clip.create_model_and_transforms("ViT-B-32", pretrained="laion2b_s34b_b79k")
+tokenizer = open_clip.get_tokenizer("ViT-B-32")
+model = model.eval().cuda().half()
+with torch.no_grad():
+    q = model.encode_text(tokenizer(["what brand is on this billboard?"]).cuda())
+    q = (q / q.norm(dim=-1, keepdim=True)).float().cpu().numpy()[0]
+
+db = lancedb.connect("hf://datasets/lance-format/textvqa-lance/data")
+tbl = db.open_table("validation")
+
+results = (
+    tbl.search(q.tolist(), vector_column_name="image_emb")
+    .metric("cosine")
+    .select(["question", "answer", "ocr_tokens"])
+    .limit(10)
+    .to_list()
+)
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/textvqa-lance/data")
+tbl = db.open_table("validation")
+
+results = (
+    tbl.search("brand name")
+    .select(["question", "answer"])
+    .limit(10)
+    .to_list()
+)
 ```
 
 ## Why Lance?

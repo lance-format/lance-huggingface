@@ -66,12 +66,76 @@ ds = lance.dataset("hf://datasets/lance-format/gqa-testdev-balanced-lance/data/t
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/gqa-testdev-balanced-lance/data")
+tbl = db.open_table("testdev")
+print(f"LanceDB table opened with {len(tbl)} image-question pairs")
+```
+
+### LanceDB vector search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/gqa-testdev-balanced-lance/data")
+tbl = db.open_table("testdev")
+
+ref = tbl.search().limit(1).select(["question_emb", "question"]).to_list()[0]
+query_embedding = ref["question_emb"]
+
+results = (
+    tbl.search(query_embedding, vector_column_name="question_emb")
+    .metric("cosine")
+    .select(["question", "answer"])
+    .limit(5)
+    .to_list()
+)
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/gqa-testdev-balanced-lance/data")
+tbl = db.open_table("testdev")
+
+results = (
+    tbl.search("color of the car")
+    .select(["question", "answer"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Filter by reasoning type
 
 ```python
 import lance
 ds = lance.dataset("hf://datasets/lance-format/gqa-testdev-balanced-lance/data/testdev.lance")
 verify_qs = ds.scanner(filter="structural = 'verify'", columns=["question", "answer"], limit=5).to_table()
+```
+
+### Filter with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/gqa-testdev-balanced-lance/data")
+tbl = db.open_table("testdev")
+verify_qs = (
+    tbl.search()
+    .where("structural = 'verify'")
+    .select(["question", "answer"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Why Lance?

@@ -55,6 +55,18 @@ ds = lance.dataset("hf://datasets/lance-format/fashion-mnist-lance/data/train.la
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/fashion-mnist-lance/data")
+tbl = db.open_table("train")
+print(f"LanceDB table opened with {len(tbl)} images")
+```
+
 ## Load with `datasets.load_dataset`
 
 ```python
@@ -87,12 +99,42 @@ neighbors = ds.scanner(
 ).to_table().to_pylist()
 ```
 
+### LanceDB vector search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/fashion-mnist-lance/data")
+tbl = db.open_table("train")
+
+ref = tbl.search().limit(1).select(["image_emb"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding)
+    .metric("cosine")
+    .select(["id", "label_name"])
+    .limit(5)
+    .to_list()
+)
+```
+
 ## Filter by class
 
 ```python
 import lance
 ds = lance.dataset("hf://datasets/lance-format/fashion-mnist-lance/data/train.lance")
 sneakers = ds.scanner(filter="label_name = 'Sneaker'", columns=["id"], limit=5).to_table()
+```
+
+### Filter by class with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/fashion-mnist-lance/data")
+tbl = db.open_table("train")
+sneakers = tbl.search().where("label_name = 'Sneaker'").select(["id"]).limit(5).to_list()
 ```
 
 ## Why Lance?

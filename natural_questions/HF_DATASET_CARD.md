@@ -58,6 +58,55 @@ ds = lance.dataset("hf://datasets/lance-format/natural-questions-val-lance/data/
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/natural-questions-val-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} questions")
+```
+
+### LanceDB semantic question search
+
+```python
+import lancedb
+from sentence_transformers import SentenceTransformer
+
+encoder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cuda")
+q = encoder.encode(["who wrote the declaration of independence"], normalize_embeddings=True)[0]
+
+db = lancedb.connect("hf://datasets/lance-format/natural-questions-val-lance/data")
+tbl = db.open_table("validation")
+
+results = (
+    tbl.search(q.tolist(), vector_column_name="question_emb")
+    .metric("cosine")
+    .select(["question", "short_answers", "document_title"])
+    .limit(5)
+    .to_list()
+)
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/natural-questions-val-lance/data")
+tbl = db.open_table("validation")
+
+results = (
+    tbl.search("declaration of independence")
+    .select(["question", "document_title"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Get only questions with short-answer spans
 
 ```python
@@ -68,6 +117,22 @@ short = ds.scanner(
     columns=["question", "short_answers", "document_title"],
     limit=10,
 ).to_table().to_pylist()
+```
+
+### Filter with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/natural-questions-val-lance/data")
+tbl = db.open_table("validation")
+short = (
+    tbl.search()
+    .where("has_short_answer = true")
+    .select(["question", "short_answers", "document_title"])
+    .limit(10)
+    .to_list()
+)
 ```
 
 ## Read the full Wikipedia HTML for one question

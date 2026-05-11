@@ -102,11 +102,50 @@ neighbors = ds.scanner(
 print(neighbors)
 ```
 
+### LanceDB vector search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/mnist-lance/data")
+tbl = db.open_table("train")
+
+ref = tbl.search().limit(1).select(["image_emb"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding)
+    .metric("cosine")
+    .select(["id", "label", "label_name"])
+    .limit(5)
+    .to_list()
+)
+for row in results:
+    print(row["id"], row["label"], row["label_name"])
+```
+
 ## Filter by class
 
 ```python
 ds = lance.dataset("hf://datasets/lance-format/mnist-lance/data/train.lance")
 sevens = ds.scanner(filter="label = 7", columns=["id"], limit=10).to_table()
+print(sevens)
+```
+
+### Filter by class with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/mnist-lance/data")
+tbl = db.open_table("train")
+sevens = (
+    tbl.search()
+    .where("label = 7")
+    .select(["id"])
+    .limit(10)
+    .to_list()
+)
 print(sevens)
 ```
 

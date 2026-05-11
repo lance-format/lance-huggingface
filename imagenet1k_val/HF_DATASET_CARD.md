@@ -58,6 +58,18 @@ ds = lance.dataset("hf://datasets/lance-format/imagenet-1k-val-lance/data/valida
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/imagenet-1k-val-lance/data")
+tbl = db.open_table("validation")
+print(f"LanceDB table opened with {len(tbl)} images")
+```
+
 > **Tip — for production use, download locally first** to avoid Hub rate limits:
 > ```bash
 > hf download lance-format/imagenet-1k-val-lance --repo-type dataset --local-dir ./imagenet-1k-val-lance
@@ -83,12 +95,48 @@ for n in neighbors:
     print(n)
 ```
 
+### LanceDB vector search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/imagenet-1k-val-lance/data")
+tbl = db.open_table("validation")
+
+ref = tbl.search().limit(1).select(["image_emb", "label_name"]).to_list()[0]
+query_embedding = ref["image_emb"]
+
+results = (
+    tbl.search(query_embedding)
+    .metric("cosine")
+    .select(["id", "label_name"])
+    .limit(5)
+    .to_list()
+)
+```
+
 ## Filter by class
 
 ```python
 import lance
 ds = lance.dataset("hf://datasets/lance-format/imagenet-1k-val-lance/data/validation.lance")
 goldens = ds.scanner(filter="label_name = 'golden_retriever'", columns=["id"], limit=5).to_table()
+```
+
+### Filter by class with LanceDB
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/imagenet-1k-val-lance/data")
+tbl = db.open_table("validation")
+goldens = (
+    tbl.search()
+    .where("label_name = 'golden_retriever'")
+    .select(["id"])
+    .limit(5)
+    .to_list()
+)
 ```
 
 ## Working with images

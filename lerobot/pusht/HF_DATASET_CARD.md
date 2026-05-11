@@ -45,6 +45,44 @@ print("videos:",   videos.count_rows())
 print("episodes:", episodes.count_rows())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries. Each `.lance` file in `data/` is a table — open by name.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/lerobot-pusht-lance/data")
+
+frames    = db.open_table("frames")
+videos    = db.open_table("videos")
+episodes  = db.open_table("episodes")
+
+print("frames:",   len(frames))
+print("videos:",   len(videos))
+print("episodes:", len(episodes))
+```
+
+### LanceDB query example
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/lerobot-pusht-lance/data")
+tbl = db.open_table("frames")
+
+# Browse a few frames from the first episode
+results = (
+    tbl.search()
+    .where("episode_index = 0")
+    .select(["episode_index", "frame_index", "timestamp"])
+    .limit(5)
+    .to_list()
+)
+for row in results:
+    print(row)
+```
+
 ## Pull a video segment for one episode
 
 ```python

@@ -56,6 +56,54 @@ ds = lance.dataset("hf://datasets/lance-format/chartqa-lance/data/test.lance")
 print(ds.count_rows(), ds.schema.names, ds.list_indices())
 ```
 
+## Load with LanceDB
+
+These tables can also be consumed by [LanceDB](https://lancedb.github.io/lancedb/), the multimodal lakehouse and embedded search library built on top of Lance, for simplified vector search and other queries.
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/chartqa-lance/data")
+tbl = db.open_table("test")
+print(f"LanceDB table opened with {len(tbl)} chart-question pairs")
+```
+
+### LanceDB vector search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/chartqa-lance/data")
+tbl = db.open_table("test")
+
+ref = tbl.search().limit(1).select(["question_emb", "question"]).to_list()[0]
+query_embedding = ref["question_emb"]
+
+results = (
+    tbl.search(query_embedding, vector_column_name="question_emb")
+    .metric("cosine")
+    .select(["question", "answer"])
+    .limit(5)
+    .to_list()
+)
+```
+
+### LanceDB full-text search
+
+```python
+import lancedb
+
+db = lancedb.connect("hf://datasets/lance-format/chartqa-lance/data")
+tbl = db.open_table("test")
+
+results = (
+    tbl.search("percentage")
+    .select(["question", "answer"])
+    .limit(10)
+    .to_list()
+)
+```
+
 ## Source & license
 
 Converted from [`lmms-lab/ChartQA`](https://huggingface.co/datasets/lmms-lab/ChartQA). The original ChartQA dataset is released under the GNU GPL-3.0 license by Masry et al.
