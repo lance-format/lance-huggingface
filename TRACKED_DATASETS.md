@@ -33,7 +33,7 @@ All datasets converted to Lance format under [`huggingface.co/lance-format`](htt
 | 27 | `lerobot/xvla-soft-fold/` | [`lerobot-xvla-soft-fold`](https://huggingface.co/datasets/lance-format/lerobot-xvla-soft-fold) | Robotics episodes (LeRobot v3.0) | LeRobot xVLA soft-fold | frames + videos + episodes | per-camera blob + episode segments | ✅ (existing) |
 | 28 | `laion-1M/` | [`laion-1m`](https://huggingface.co/datasets/lance-format/laion-1m) | Image-caption (LAION subset) | LAION-5B subset | train 1,160,000 | CLIP IVF_PQ + FTS on caption | ✅ (existing) |
 | 29 | `openvid_hf/` | [`openvid-lance`](https://huggingface.co/datasets/lance-format/openvid-lance) | Text-to-video | `nkp37/OpenVid-1M` | train 937,957 | 1024-d video emb · IVF_PQ · FTS on caption · video blobs | ✅ (existing) |
-| 30 | `fineweb_edu/` & `fineweb/` | [`fineweb-edu`](https://huggingface.co/datasets/lance-format/fineweb-edu) | Text corpus (web pre-training) | `HuggingFaceFW/fineweb-edu` | train ≈ 1.53 B | Cohere text emb + IVF_PQ + FTS | ✅ (existing) |
+| 30 | `fineweb_edu/` | [`fineweb-edu`](https://huggingface.co/datasets/lance-format/fineweb-edu) | Text corpus (web pre-training) | `HuggingFaceFW/fineweb-edu` | train ≈ 1.53 B | Cohere text emb + IVF_PQ + FTS | ✅ (existing) |
 
 Status legend: ✅ live · ⏳ in flight · ⛔ skipped (see notes).
 

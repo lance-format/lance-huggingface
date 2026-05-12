@@ -36,7 +36,7 @@ Every folder is a self-contained converter — `dataprep.py` pulls the source fr
 | `laion-1M/`           | [`lance-format/laion-1m`](https://huggingface.co/datasets/lance-format/laion-1m)                     | image-caption (1M) | CLIP image emb · IVF_PQ · FTS on caption |
 | `openvid_hf/`         | [`lance-format/openvid-lance`](https://huggingface.co/datasets/lance-format/openvid-lance)           | text-to-video | video blobs · 1024-d emb · IVF_PQ · FTS on caption |
 | `lerobot/xvla-soft-fold/` | [`lance-format/lerobot-xvla-soft-fold`](https://huggingface.co/datasets/lance-format/lerobot-xvla-soft-fold) | robotics episodes | episode video blobs |
-| `fineweb/` & `fineweb_edu/` | [`lance-format/fineweb-edu`](https://huggingface.co/datasets/lance-format/fineweb-edu) | text corpus | Cohere embeddings · IVF_PQ · FTS |
+| `fineweb_edu/` | [`lance-format/fineweb-edu`](https://huggingface.co/datasets/lance-format/fineweb-edu) | text corpus | Cohere embeddings · IVF_PQ · FTS |
 
 ## Shared helpers — `_common/`
 
