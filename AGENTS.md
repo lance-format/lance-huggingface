@@ -6,9 +6,6 @@
 - Treat `HF_DATASET_CARD.md` as public user-facing documentation for Hugging Face dataset consumers.
 - Do not copy maintainer workflows (data generation, conversion internals, upload mechanics) into `HF_DATASET_CARD.md` unless explicitly requested.
 
-## HF dataset card writing rules
+## Writing HF dataset cards
 
-- Keep `meta/info.json` in the dataset card because users rely on it for global metadata and feature definitions.
-- Explain the purpose of each table in plain language (what it is for, when to use it), not only terse schema bullets.
-- Provide clear, readable schema summaries for each table; avoid raw PyArrow schema dumps.
-- Prefer usage examples that help users consume the published dataset (download/read/sample), not maintainer pipeline steps.
+When creating or revising an `HF_DATASET_CARD.md`, follow the conventions in [skills/hf-dataset-card-writer/SKILL.md](skills/hf-dataset-card-writer/SKILL.md). That skill defines the six-section body structure (Search, Curate, Evolve, Train, Versioning, Materialize a subset), the writing voice, the example style rules (path handling, materialization discipline, LanceDB-first idioms, SQL-first column derivation), and links to the current canonical reference card.
