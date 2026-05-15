@@ -58,9 +58,18 @@ A Lance-formatted version of the [COCO Captions 2017](https://cocodataset.org/) 
 - `INVERTED` (FTS) on `caption` — keyword and hybrid search
 - `BTREE` on `image_id` — fast lookup by COCO image id
 
+## Why Lance?
+
+1. **Blazing Fast Random Access**: Optimized for fetching scattered rows, making it ideal for random sampling, real-time ML serving, and interactive applications without performance degradation.
+2. **Native Multimodal Support**: Store text, embeddings, and other data types together in a single file. Large binary objects are loaded lazily, and vectors are optimized for fast similarity search.
+3. **Native Index Support**: Lance comes with fast, on-disk, scalable vector and FTS indexes that sit right alongside the dataset on the Hub, so you can share not only your data but also your embeddings and indexes without your users needing to recompute them.
+4. **Efficient Data Evolution**: Add new columns and backfill data without rewriting the entire dataset. This is perfect for evolving ML features, adding new embeddings, or introducing moderation tags over time.
+5. **Versatile Querying**: Supports combining vector similarity search, full-text search, and SQL-style filtering in a single query, accelerated by on-disk indexes.
+6. **Data Versioning**: Every mutation commits a new version; previous versions remain intact on disk. Tags pin a snapshot by name, so retrieval systems and training runs can reproduce against an exact slice of history.
+
 ## Load with `datasets.load_dataset`
 
-The standard HuggingFace `datasets` interface, suitable when your pipeline already speaks `Dataset` / `IterableDataset` or you want a quick streaming sample.
+You can load Lance datasets via the standard HuggingFace `datasets` interface, suitable when your pipeline already speaks `Dataset` / `IterableDataset` or you want a quick streaming sample.
 
 ```python
 import datasets
@@ -72,7 +81,7 @@ for row in hf_ds.take(3):
 
 ## Load with LanceDB
 
-LanceDB is the embedded retrieval library built on top of the Lance format, and is the interface most users interact with. It wraps the dataset as a queryable table with search and filter builders, and is the entry point used by the Search, Curate, Evolve, Versioning, and Materialize-a-subset sections below.
+LanceDB is the embedded retrieval library built on top of the Lance format ([docs](https://lancedb.com/docs)), and is the interface most users interact with. It wraps the dataset as a queryable table with search and filter builders, and is the entry point used by the Search, Curate, Evolve, Versioning, and Materialize-a-subset sections below.
 
 ```python
 import lancedb
