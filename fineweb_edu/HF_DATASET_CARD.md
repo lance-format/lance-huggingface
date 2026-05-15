@@ -219,27 +219,25 @@ The original columns and indices are untouched, so existing code that does not r
 
 ## Train
 
-Projection lets a training loop read only the columns each step actually needs. `lance.torch.data.LanceDataset` exposes this through its `columns` argument and plugs into the standard `torch.utils.data.DataLoader`, so prefetching, shuffling, and batching behave as in any PyTorch pipeline. For language-model pretraining the natural projection is just the `text` column; for a retrieval probe or a reranker on top of frozen features, project the precomputed embedding instead.
+Projection lets a training loop read only the columns each step actually needs. LanceDB tables expose this through `Permutation.identity(tbl).select_columns([...])`, which plugs straight into the standard `torch.utils.data.DataLoader` so prefetching, shuffling, and batching behave as in any PyTorch pipeline. For language-model pretraining the natural projection is just the `text` column; for a retrieval probe or a reranker on top of frozen features, project the precomputed embedding instead.
 
 ```python
-from lance.torch.data import LanceDataset
+import lancedb
+from lancedb.permutation import Permutation
 from torch.utils.data import DataLoader
 
-train_ds = LanceDataset(
-    "./fineweb-edu/data/train.lance",
-    columns=["text"],
-    batch_size=64,
-    shuffle=True,
-)
+db = lancedb.connect("./fineweb-edu/data")
+tbl = db.open_table("train")
 
-loader = DataLoader(train_ds, num_workers=8, batch_size=None)
+train_ds = Permutation.identity(tbl).select_columns(["text"])
+loader = DataLoader(train_ds, batch_size=64, shuffle=True, num_workers=8)
 
 for batch in loader:
-    texts = batch["text"]  # list of str
-    # tokenize, forward, backward...
+    # batch carries only the projected columns; tokenize, forward, backward...
+    ...
 ```
 
-Switching feature sets is a configuration change: setting `columns=["text_embedding"]` on the next run reads only the 384-d vectors and skips the text body entirely, which is the right shape for training a lightweight retrieval head on cached embeddings. Columns added in Evolve cost nothing per batch until they are explicitly projected.
+Switching feature sets is a configuration change: passing `["text_embedding"]` to `select_columns(...)` on the next run reads only the 384-d vectors and skips the text body entirely, which is the right shape for training a lightweight retrieval head on cached embeddings. Columns added in Evolve cost nothing per batch until they are explicitly projected.
 
 ## Versioning
 

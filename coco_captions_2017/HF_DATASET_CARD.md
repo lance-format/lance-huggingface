@@ -205,28 +205,26 @@ The original columns and indices are untouched, so existing code that does not r
 
 ## Train
 
-Projection lets a training loop read only the columns each step actually needs. `lance.torch.data.LanceDataset` exposes this through its `columns` argument and plugs into the standard `torch.utils.data.DataLoader`, so prefetching, shuffling, and batching behave as in any PyTorch pipeline. For a CLIP-style contrastive run, project the JPEG bytes and a sampled caption; for a reranker or probe on top of frozen features, project the precomputed embeddings instead.
+Projection lets a training loop read only the columns each step actually needs. LanceDB tables expose this through `Permutation.identity(tbl).select_columns([...])`, which plugs straight into the standard `torch.utils.data.DataLoader` so prefetching, shuffling, and batching behave as in any PyTorch pipeline. For a CLIP-style contrastive run, project the JPEG bytes and a sampled caption; for a reranker or probe on top of frozen features, project the precomputed embeddings instead.
 
 ```python
-from lance.torch.data import LanceDataset
+import lancedb
+from lancedb.permutation import Permutation
 from torch.utils.data import DataLoader
 
-train_ds = LanceDataset(
-    "hf://datasets/lance-format/coco-captions-2017-lance/data/val.lance",
-    columns=["image", "caption"],
-    batch_size=128,
-    shuffle=True,
-)
+db = lancedb.connect("hf://datasets/lance-format/coco-captions-2017-lance/data")
+tbl = db.open_table("val")
 
-loader = DataLoader(train_ds, num_workers=4, batch_size=None)
+train_ds = Permutation.identity(tbl).select_columns(["image", "caption"])
+loader = DataLoader(train_ds, batch_size=128, shuffle=True, num_workers=4)
 
 for batch in loader:
-    images = batch["image"]      # list of JPEG bytes
-    captions = batch["caption"]  # list of str
-    # decode, tokenize, encode, contrastive loss...
+    # batch carries only the projected columns; decode the JPEG bytes,
+    # tokenize the captions, encode, contrastive loss...
+    ...
 ```
 
-Switching feature sets is a configuration change: setting `columns=["image_emb", "text_emb"]` on the next run skips JPEG decoding entirely and reads only the cached 512-d vectors, which is the right shape for training a lightweight reranker or a linear probe.
+Switching feature sets is a configuration change: passing `["image_emb", "text_emb"]` to `select_columns(...)` on the next run skips JPEG decoding entirely and reads only the cached 512-d vectors, which is the right shape for training a lightweight reranker or a linear probe.
 
 ## Versioning
 

@@ -188,28 +188,26 @@ The original columns and indices are untouched, so existing code that does not r
 
 ## Train
 
-Projection lets a training loop read only the columns each step actually needs. `lance.torch.data.LanceDataset` exposes this through its `columns` argument and plugs into the standard `torch.utils.data.DataLoader`, so prefetch, shuffling, and batching behave as in any PyTorch pipeline. Columns added in the Evolve section above cost nothing per batch until they are explicitly projected.
+Projection lets a training loop read only the columns each step actually needs. LanceDB tables expose this through `Permutation.identity(tbl).select_columns([...])`, which plugs straight into the standard `torch.utils.data.DataLoader` so prefetch, shuffling, and batching behave as in any PyTorch pipeline. Columns added in the Evolve section above cost nothing per batch until they are explicitly projected.
 
 ```python
-from lance.torch.data import LanceDataset
+import lancedb
+from lancedb.permutation import Permutation
 from torch.utils.data import DataLoader
 
-train_ds = LanceDataset(
-    "hf://datasets/lance-format/laion-1m/data/train.lance",
-    columns=["image", "caption"],   # img_emb / img_emb_dinov3 stay on disk
-    batch_size=256,
-    shuffle=True,
-)
+db = lancedb.connect("hf://datasets/lance-format/laion-1m/data")
+tbl = db.open_table("train")
 
-loader = DataLoader(train_ds, num_workers=4, batch_size=None)
+train_ds = Permutation.identity(tbl).select_columns(["image", "caption"])
+loader = DataLoader(train_ds, batch_size=256, shuffle=True, num_workers=4)
 
 for batch in loader:
-    images = batch["image"]      # list of JPEG bytes
-    captions = batch["caption"]  # list of str
-    # ... decode, tokenize, forward, backward ...
+    # batch carries only the projected columns; img_emb / img_emb_dinov3 stay on disk.
+    # decode the JPEG bytes, tokenize the captions, forward, backward...
+    ...
 ```
 
-Switching feature sets is a configuration change: setting `columns=["img_emb_dinov3", "caption"]` on the next run reads only those columns, with no data movement or shard reorganization.
+Switching feature sets is a configuration change: passing `["img_emb_dinov3", "caption"]` to `select_columns(...)` on the next run reads only those columns, with no data movement or shard reorganization.
 
 ## Versioning
 

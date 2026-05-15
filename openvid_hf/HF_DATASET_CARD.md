@@ -245,29 +245,37 @@ The original columns and the `video_blob` side file are untouched, so existing c
 
 ## Train
 
-Projection lets a training loop read only the columns each step actually needs. `lance.torch.data.LanceDataset` exposes this through its `columns` argument and plugs into the standard `torch.utils.data.DataLoader`, so prefetching, shuffling, and batching behave as in any PyTorch pipeline. For a video model, the typical projection is the MP4 bytes alongside the caption and any scalar conditioning signal — the quality columns added in Evolve cost nothing per batch until they are explicitly projected.
+A common pattern for video training is to pre-extract decoded frames once into a derived LanceDB table, and train against that table with the regular projection-based dataloader. `take_blobs` is the mechanism that makes the extraction step tractable: each clip's MP4 is randomly addressable, so the pass can subset bytes on demand and write decoded windows into a fresh table without an external file store. Other workflows project `video_blob` directly through `select_columns(...)` and decode at the batch boundary, or skip pixels entirely and train on the cached embeddings — the right shape is workload-specific. The actual training loop is the same `Permutation.identity(tbl).select_columns(...)` snippet in every case; only the source table and the column list change.
+
+Against a pre-extracted frames table:
 
 ```python
-from lance.torch.data import LanceDataset
+import lancedb
+from lancedb.permutation import Permutation
 from torch.utils.data import DataLoader
 
-train_ds = LanceDataset(
-    "hf://datasets/lance-format/openvid-lance/data/train.lance",
-    columns=["video_blob", "caption", "aesthetic_score"],
-    batch_size=8,
-    shuffle=True,
-)
+db = lancedb.connect("./openvid-frames")   # local table produced by the one-time extraction
+tbl = db.open_table("train")
 
-loader = DataLoader(train_ds, num_workers=4, batch_size=None)
-
-for batch in loader:
-    videos = batch["video_blob"]   # raw MP4 byte strings
-    captions = batch["caption"]
-    scores = batch["aesthetic_score"]
-    # decode with PyAV / torchcodec / decord, tokenize captions, then forward...
+train_ds = Permutation.identity(tbl).select_columns(["frames", "caption", "aesthetic_score"])
+loader = DataLoader(train_ds, batch_size=8, shuffle=True, num_workers=4)
 ```
 
-Switching feature sets is a configuration change: setting `columns=["embedding", "caption"]` on the next run reads only the precomputed video embeddings and skips the MP4 bytes entirely, which is the right shape for training a lightweight reranker or a contrastive head on top of frozen features.
+Against the cached embeddings on the source table (no pre-extraction):
+
+```python
+import lancedb
+from lancedb.permutation import Permutation
+from torch.utils.data import DataLoader
+
+src_db = lancedb.connect("hf://datasets/lance-format/openvid-lance/data")
+src_tbl = src_db.open_table("train")
+
+train_ds = Permutation.identity(src_tbl).select_columns(["embedding", "caption"])
+loader = DataLoader(train_ds, batch_size=256, shuffle=True, num_workers=4)
+```
+
+The inline `video_blob` storage and `take_blobs` still earn their place outside of the training loop — random-access inspection of a clip in a notebook, sampling for human review, one-off evaluation against a held-out set, and the pre-extraction step itself — but they are not the dataloader.
 
 ## Versioning
 
