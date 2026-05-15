@@ -27,8 +27,24 @@ The top of every card contains, in order:
 4. Splits
 5. Schema (table with column names, types, notes — not a raw PyArrow dump)
 6. Pre-built indices
-7. Loaders — in order: `datasets.load_dataset`, `lancedb.connect`, then `lance.dataset`. LanceDB comes before pylance because it is the higher-level interface most users interact with; pylance is shown below as the format-level handle for readers who want to inspect or operate on dataset internals.
-8. The "for production use, download locally first" tip with the `hf download` command
+7. "Why Lance?" — a fixed, copy-pasted section that names the six format properties the body sections rely on (see the canonical block below). Same text in every card; no per-card customization.
+8. Loaders — in order: `datasets.load_dataset`, `lancedb.connect`, then `lance.dataset`. LanceDB comes before pylance because it is the higher-level interface most users interact with; pylance is shown below as the format-level handle for readers who want to inspect or operate on dataset internals. The LanceDB loader's intro sentence carries the single LanceDB-docs link for the card: `LanceDB is the embedded retrieval library built on top of the Lance format ([docs](https://lancedb.com/docs)), and is the interface most users interact with.` That is the only place the docs URL appears — do not add it elsewhere.
+9. The "for production use, download locally first" tip with the `hf download` command
+
+### Canonical "Why Lance?" block
+
+Insert verbatim between the Pre-built indices section and the `datasets.load_dataset` loader. Do not customize per card:
+
+```markdown
+## Why Lance?
+
+1. **Blazing Fast Random Access**: Optimized for fetching scattered rows, making it ideal for random sampling, real-time ML serving, and interactive applications without performance degradation.
+2. **Native Multimodal Support**: Store text, embeddings, and other data types together in a single file. Large binary objects are loaded lazily, and vectors are optimized for fast similarity search.
+3. **Native Index Support**: Lance comes with fast, on-disk, scalable vector and FTS indexes that sit right alongside the dataset on the Hub, so you can share not only your data but also your embeddings and indexes without your users needing to recompute them.
+4. **Efficient Data Evolution**: Add new columns and backfill data without rewriting the entire dataset. This is perfect for evolving ML features, adding new embeddings, or introducing moderation tags over time.
+5. **Versatile Querying**: Supports combining vector similarity search, full-text search, and SQL-style filtering in a single query, accelerated by on-disk indexes.
+6. **Data Versioning**: Every mutation commits a new version; previous versions remain intact on disk. Tags pin a snapshot by name, so retrieval systems and training runs can reproduce against an exact slice of history.
+```
 
 Keep `meta/info.json` in the dataset card because users rely on it for global metadata and feature definitions. Explain the purpose of each table in plain language (what it is for, when to use it), not only terse schema bullets.
 
