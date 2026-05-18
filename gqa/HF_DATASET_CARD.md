@@ -3,7 +3,6 @@ license: cc-by-4.0
 task_categories:
 - visual-question-answering
 - image-text-to-text
-- lance
 language:
 - en
 tags:

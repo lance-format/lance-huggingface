@@ -4,7 +4,6 @@ task_categories:
 - image-to-text
 - image-text-to-text
 - image-feature-extraction
-- lance
 language:
 - en
 tags:

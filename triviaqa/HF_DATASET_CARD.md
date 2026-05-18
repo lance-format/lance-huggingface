@@ -3,7 +3,6 @@ license: apache-2.0
 task_categories:
 - question-answering
 - text-retrieval
-- lance
 language:
 - en
 tags:

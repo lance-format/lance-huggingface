@@ -1,9 +1,9 @@
 ---
 license: cc-by-4.0
 task_categories:
-- image-retrieval
-- multi-modal-retrieval
-- lance
+- text-to-image
+- image-to-text
+- zero-shot-image-classification
 language:
 - en
 tags:
