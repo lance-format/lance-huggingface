@@ -3,7 +3,6 @@ license: cc-by-nc-sa-3.0
 task_categories:
 - object-detection
 - image-feature-extraction
-- lance
 language:
 - en
 tags:

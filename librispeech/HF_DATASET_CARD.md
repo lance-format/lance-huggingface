@@ -4,7 +4,6 @@ task_categories:
 - automatic-speech-recognition
 - audio-classification
 - text-retrieval
-- lance
 language:
 - en
 tags:

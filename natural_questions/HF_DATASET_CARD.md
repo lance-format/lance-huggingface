@@ -3,7 +3,6 @@ license: cc-by-sa-3.0
 task_categories:
 - question-answering
 - text-retrieval
-- lance
 language:
 - en
 tags:

@@ -4,7 +4,6 @@ task_categories:
 - visual-question-answering
 - document-question-answering
 - image-text-to-text
-- lance
 language:
 - en
 tags:

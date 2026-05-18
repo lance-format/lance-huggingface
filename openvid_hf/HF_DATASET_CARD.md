@@ -3,7 +3,6 @@ license: cc-by-4.0
 task_categories:
 - text-to-video
 - video-classification
-- lance
 language:
 - en
 tags:

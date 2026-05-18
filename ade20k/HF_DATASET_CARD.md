@@ -3,7 +3,6 @@ license: bsd-3-clause
 task_categories:
 - image-segmentation
 - image-feature-extraction
-- lance
 language:
 - en
 tags:

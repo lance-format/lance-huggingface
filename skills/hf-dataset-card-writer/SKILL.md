@@ -21,7 +21,7 @@ Bulleted lists, terse callouts, and tables remain appropriate for the inherently
 
 The top of every card contains, in order:
 
-1. YAML frontmatter (license, task_categories, language, tags, pretty_name, size_categories)
+1. YAML frontmatter (license, task_categories, language, tags, pretty_name, size_categories). `task_categories` values are validated against HF's official allowlist — do not put `lance` there or the Hub will surface a "YAML Metadata Warning" on the card. Put `lance` in `tags` instead (which is free-form).
 2. Title and one-paragraph summary
 3. Key features (bullet list)
 4. Splits

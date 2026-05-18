@@ -3,7 +3,6 @@ license: mit
 task_categories:
 - question-answering
 - text-retrieval
-- lance
 language:
 - en
 tags:

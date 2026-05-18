@@ -3,7 +3,6 @@ license: other
 task_categories:
 - image-classification
 - image-feature-extraction
-- lance
 language:
 - en
 tags:
