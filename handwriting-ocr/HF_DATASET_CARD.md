@@ -31,7 +31,7 @@ configs:
 This Lance-formatted version of the [Doctor's Handwritten Prescription BD dataset](https://www.kaggle.com/datasets/mamun1113/doctors-handwritten-prescription-bd-dataset) contains 4,680 cropped PNG images of handwritten medicine names from Bangladesh. Each row keeps the original image bytes with the medicine and generic-name labels, plus deterministic search metadata derived from those labels. The dataset contains three source-preserved splits: train, validation, and test.
 
 > [!NOTE]
-> **Training note:** The same samples sppear repeatedly because a model (during training) should learn from multiple *different handwritten crops* of the same medicine, because they capture different writers, pen strokes, sizes, and image quality. The dataset would need to be shuffled and sampled appropriately before running downstream training tasks
+> **Training note:** The same samples appear repeatedly because a model (during training) should learn from multiple *different handwritten crops* of the same medicine, because they capture different writers, pen strokes, sizes, and image quality. The dataset would need to be shuffled and sampled appropriately before running downstream training tasks
 
 ## Key features
 
