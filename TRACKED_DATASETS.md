@@ -1,6 +1,6 @@
 # Tracked Datasets
 
-All datasets converted to Lance format under [`huggingface.co/lance-format`](https://huggingface.co/lance-format). Every row of every dataset stores its multimodal data **inline** (image / audio / video bytes + embeddings + metadata) — no sidecar files. Pre-built `IVF_PQ` / FTS / scalar indices ship inside each Lance directory.
+All datasets converted to Lance format under [`huggingface.co/lance-format`](https://huggingface.co/lance-format). Every row of every dataset stores its multimodal data **inline** (image / audio / video bytes + metadata, and embeddings where applicable) — no sidecar files. Pre-built FTS and scalar indices, plus `IVF_PQ` where applicable, ship inside each Lance directory.
 
 | # | Folder | HF repo | Modality / task | Source | Splits & rows | Embeddings & indices | Status |
 |---|---|---|---|---|---|---|---|
@@ -34,6 +34,7 @@ All datasets converted to Lance format under [`huggingface.co/lance-format`](htt
 | 28 | `laion-1M/` | [`laion-1m`](https://huggingface.co/datasets/lance-format/laion-1m) | Image-caption (LAION subset) | LAION-5B subset | train 1,160,000 | CLIP IVF_PQ + FTS on caption | ✅ (existing) |
 | 29 | `openvid_hf/` | [`openvid-lance`](https://huggingface.co/datasets/lance-format/openvid-lance) | Text-to-video | `nkp37/OpenVid-1M` | train 937,957 | 1024-d video emb · IVF_PQ · FTS on caption · video blobs | ✅ (existing) |
 | 30 | `fineweb_edu/` | [`fineweb-edu`](https://huggingface.co/datasets/lance-format/fineweb-edu) | Text corpus (web pre-training) | `HuggingFaceFW/fineweb-edu` | train ≈ 1.53 B | Cohere text emb + IVF_PQ + FTS | ✅ (existing) |
+| 31 | `doctors_handwritten_prescription_bd/` | `handwriting-ocr` | Handwritten medicine-word OCR | `mamun1113/doctors-handwritten-prescription-bd-dataset` | train 3,120 · validation 780 · test 780 | FTS on `searchable_summary` + BTREE/BITMAP | ⏳ |
 
 Status legend: ✅ live · ⏳ in flight · ⛔ skipped (see notes).
 
