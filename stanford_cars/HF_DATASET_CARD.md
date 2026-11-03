@@ -185,7 +185,9 @@ tbl.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table (offline labels, classifier predictions, the Make Model Year strings from the original Stanford metadata), merge them in by joining on `id`:
+The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table (offline labels, classifier predictions, the Make Model Year strings from the original Stanford metadata), add the new fields and update matching rows by `id`:
 
 ```python
 import pyarrow as pa
@@ -198,10 +200,11 @@ class_strings = pa.table({
         "Acura TL Sedan 2012",
     ]),
 })
-tbl.merge(class_strings, on="id")
+tbl.add_columns([f for f in class_strings.schema if f.name != "id"])
+tbl.merge_insert("id").when_matched_update_all().execute(class_strings)
 ```
 
-The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged. New columns become visible to every reader as soon as the operation commits. For column values that require a Python computation (e.g., running a second captioner over the image bytes), Lance provides a batch-UDF API in the underlying library — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/) for that pattern.
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., running a second captioner over the image bytes), Lance provides a batch-UDF API in the underlying library — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/) for that pattern.
 
 ## Train
 

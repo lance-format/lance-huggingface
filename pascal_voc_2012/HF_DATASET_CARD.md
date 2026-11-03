@@ -181,7 +181,9 @@ tbl.add_columns({
 })
 ```
 
-For class-level statistics — for example, a per-row list of class ids present in the mask, or a per-class pixel count — the values cannot be derived in SQL because they require decoding the PNG. Compute them once in an external table and join in by `id`:
+The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+For class-level statistics — for example, a per-row list of class ids present in the mask, or a per-class pixel count — the values cannot be derived in SQL because they require decoding the PNG. Compute them once in an external table and update matching rows by `id`:
 
 ```python
 import pyarrow as pa
@@ -190,10 +192,11 @@ class_stats = pa.table({
     "id": pa.array([0, 1, 2], type=pa.int64()),
     "classes_present": pa.array([[15], [7, 15], [9]], type=pa.list_(pa.int8())),
 })
-tbl.merge(class_stats, on="id")
+tbl.add_columns([f for f in class_stats.schema if f.name != "id"])
+tbl.merge_insert("id").when_matched_update_all().execute(class_stats)
 ```
 
-The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged. New columns become visible to every reader as soon as the operation commits. For column values that require running a model over the image bytes (a second-pass embedding, an instance segmentation, a depth prediction), Lance also provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require running a model over the image bytes (a second-pass embedding, an instance segmentation, a depth prediction), Lance also provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
 
 ## Train
 

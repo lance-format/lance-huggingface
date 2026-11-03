@@ -20,7 +20,7 @@ A Lance-formatted version of the [OpenVid-1M](https://huggingface.co/datasets/nk
 
 ## Key features
 
-- **Inline MP4 bytes** in the `video_blob` column, stored in a side blob file and surfaced as lazy `BlobFile` handles via `take_blobs` — metadata scans, search, and filtering never read a single byte of video data.
+- **Inline MP4 bytes** in the `video_blob` column, stored in a side blob file and surfaced as lazy `BlobFile` handles via `tbl.fetch_blob_files` — metadata scans, search, and filtering never read a single byte of video data.
 - **Pre-computed 1024-dim video embeddings** in `embedding` with a bundled `IVF_PQ` ANN index.
 - **Pre-built `INVERTED` (FTS) index on `caption`** for keyword and hybrid search.
 - **Rich quality signals** — `aesthetic_score`, `motion_score`, `temporal_consistency_score`, `camera_motion`, `fps`, `seconds` — that downstream filters can stack on.
@@ -33,7 +33,7 @@ A Lance-formatted version of the [OpenVid-1M](https://huggingface.co/datasets/nk
 
 | Column | Type | Notes |
 |---|---|---|
-| `video_blob` | `large_binary` (blob-encoded) | Inline MP4 bytes; stored in a separate blob file and read lazily through `take_blobs` |
+| `video_blob` | `large_binary` (blob-encoded) | Inline MP4 bytes; stored in a separate blob file and read lazily through `tbl.fetch_blob_files` |
 | `video_path` | `string` | Original file path / object key |
 | `caption` | `string` | Text description of the clip |
 | `embedding` | `fixed_size_list<float32, 1024>` | Video embedding |
@@ -85,7 +85,7 @@ print(len(tbl))
 
 ## Load with Lance
 
-`pylance` is the Python binding for the Lance format and works directly with the format's lower-level APIs. Reach for it when you want to inspect dataset internals — schema, scanner, fragments, the list of pre-built indices — or when you need the blob-level `take_blobs` entry point that streams video bytes lazily from inline storage.
+`pylance` is the Python binding for the Lance format and works directly with the format's lower-level APIs. Reach for it when you want to inspect dataset internals — schema, scanner, fragments, and the list of pre-built indices.
 
 ```python
 import lance
@@ -177,15 +177,11 @@ print(f"{len(candidates)} clips selected")
 
 The scan above never reads the `video_blob` column. Lance stores blobs in a separate side file referenced by the dataset, so column-projected reads skip them entirely until they are explicitly requested. That is what makes "find me the right clips" a metadata-only operation against a million-row video corpus.
 
-Once the candidate set is fixed, pull the actual video bytes through pylance's `take_blobs`. It returns one `BlobFile` per row — a file-like handle that streams from inline blob storage on demand rather than reading the full clip into Python memory up front. For video specifically, this is the operation that matters: a video model trainer or a dataloader inspecting a few seconds of each clip should never have to materialize entire MP4s in memory just to inspect or decode part of them.
+Once the candidate set is fixed, open lazy video handles with `tbl.fetch_blob_files` (requires `lancedb >= 0.41.0` for legacy blob-encoded columns). It returns one `BlobFile` per row — a seekable file-like handle that streams from inline blob storage on demand rather than reading the full clip into Python memory up front. For video specifically, this is the operation that matters: a video model trainer or a dataloader inspecting a few seconds of each clip should never have to materialize entire MP4s in memory just to inspect or decode part of them.
 
 ```python
-import lance
-
-ds = lance.dataset("hf://datasets/lance-format/openvid-lance/data/train.lance")
-
 row_ids = [r["_rowid"] for r in candidates[:10]]
-blob_files = ds.take_blobs("video_blob", ids=row_ids)
+blob_files = tbl.fetch_blob_files("video_blob", row_ids)
 ```
 
 Each `BlobFile` implements the file protocol, so it can be passed straight to a decoder like PyAV without first being copied through a `bytes` object. The decoder seeks and reads against the underlying handle, which means a 2-second sample from a 30-second clip moves only the bytes the decoder actually touches — not the whole MP4.
@@ -210,6 +206,7 @@ If you only need the raw bytes (e.g., to persist a hand-picked subset to disk), 
 
 ```python
 for r_id, blob in zip(row_ids, blob_files):
+    blob.seek(0)
     with open(f"clip_{r_id}.mp4", "wb") as f:
         f.write(blob.read())
 ```
@@ -237,7 +234,9 @@ tbl.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table (offline labels, safety classifications, a second embedding from a different encoder), merge them in by joining on `video_path`:
+The original columns and the `video_blob` side file are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table (offline labels, safety classifications, a second embedding from a different encoder), add the new fields and update matching rows by `video_path`:
 
 ```python
 import pyarrow as pa
@@ -246,14 +245,15 @@ labels = pa.table({
     "video_path": pa.array(["s3://openvid/clips/00001.mp4", "s3://openvid/clips/00002.mp4"]),
     "scene_label": pa.array(["beach", "city"]),
 })
-tbl.merge(labels, on="video_path")
+tbl.add_columns([f for f in labels.schema if f.name != "video_path"])
+tbl.merge_insert("video_path").when_matched_update_all().execute(labels)
 ```
 
-The original columns and the `video_blob` side file are untouched, so existing code that does not reference the new columns continues to work unchanged. New columns become visible to every reader as soon as the operation commits. For column values that require a Python computation (e.g., running an alternative video encoder over the inline bytes), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., running an alternative video encoder over the inline bytes), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
 
 ## Train
 
-A common pattern for video training is to pre-extract decoded frames once into a derived LanceDB table, and train against that table with the regular projection-based dataloader. `take_blobs` is the mechanism that makes the extraction step tractable: each clip's MP4 is randomly addressable, so the pass can subset bytes on demand and write decoded windows into a fresh table without an external file store. Other workflows project `video_blob` directly through `select_columns(...)` and decode at the batch boundary, or skip pixels entirely and train on the cached embeddings — the right shape is workload-specific. The actual training loop is the same `Permutation.identity(tbl).select_columns(...)` snippet in every case; only the source table and the column list change.
+A common pattern for video training is to pre-extract decoded frames once into a derived LanceDB table, and train against that table with the regular projection-based dataloader. `tbl.fetch_blob_files` is the mechanism that makes the extraction step tractable: each clip's MP4 is randomly addressable, so the pass can subset bytes on demand and write decoded windows into a fresh table without an external file store. Other workflows project `video_blob` directly through `select_columns(...)` and decode at the batch boundary, or skip pixels entirely and train on the cached embeddings — the right shape is workload-specific. The actual training loop is the same `Permutation.identity(tbl).select_columns(...)` snippet in every case; only the source table and the column list change.
 
 Against a pre-extracted frames table:
 
@@ -283,7 +283,7 @@ train_ds = Permutation.identity(src_tbl).select_columns(["embedding", "caption"]
 loader = DataLoader(train_ds, batch_size=256, shuffle=True, num_workers=4)
 ```
 
-The inline `video_blob` storage and `take_blobs` still earn their place outside of the training loop — random-access inspection of a clip in a notebook, sampling for human review, one-off evaluation against a held-out set, and the pre-extraction step itself — but they are not the dataloader.
+The inline `video_blob` storage and `tbl.fetch_blob_files` still earn their place outside of the training loop — random-access inspection of a clip in a notebook, sampling for human review, one-off evaluation against a held-out set, and the pre-extraction step itself — but they are not the dataloader.
 
 ## Versioning
 
@@ -338,7 +338,7 @@ local_db = lancedb.connect("./openvid-subset")
 local_db.create_table("train", batches)
 ```
 
-The resulting `./openvid-subset` is a first-class LanceDB database. Every snippet in the Evolve, Train, and Versioning sections above works against it by swapping `hf://datasets/lance-format/openvid-lance/data` for `./openvid-subset`. The same `take_blobs` pattern from Curate also works against the local copy — and runs faster, because the blob side file is now on local disk.
+The resulting `./openvid-subset` is a first-class LanceDB database. Every snippet in the Evolve, Train, and Versioning sections above works against it by swapping `hf://datasets/lance-format/openvid-lance/data` for `./openvid-subset`. The same `fetch_blob_files` pattern from Curate also works against the local copy — and runs faster, because the blob side file is now on local disk.
 
 ## Citation
 

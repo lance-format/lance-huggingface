@@ -181,7 +181,9 @@ tbl.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table (offline labels, classifier predictions, aesthetic scores), merge them in by joining on the `key` column:
+The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table (offline labels, classifier predictions, aesthetic scores), add the new fields and update matching rows by `key`:
 
 ```python
 import pyarrow as pa
@@ -190,10 +192,11 @@ labels = pa.table({
     "key": pa.array([0, 1, 2]),
     "aesthetic_score": pa.array([7.1, 6.4, 8.9]),
 })
-tbl.merge(labels, on="key")
+tbl.add_columns([f for f in labels.schema if f.name != "key"])
+tbl.merge_insert("key").when_matched_update_all().execute(labels)
 ```
 
-The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged. New columns become visible to every reader as soon as the operation commits. For column values that require a Python computation (e.g., running an embedding model over the image bytes), Lance provides a batch-UDF API in the underlying library — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/) for that pattern.
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., running an embedding model over the image bytes), Lance provides a batch-UDF API in the underlying library — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/) for that pattern.
 
 ## Train
 

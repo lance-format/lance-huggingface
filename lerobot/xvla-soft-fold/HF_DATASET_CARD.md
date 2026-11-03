@@ -26,7 +26,7 @@ A Lance-formatted version of [`lerobot/xvla-soft-fold`](https://huggingface.co/d
 ## Key features
 
 - **Three-table layout** — `frames`, `episodes`, `videos` — so frame-level training, episode-level trajectory work, and raw video access live side-by-side without scattered parquet shards or sidecar MP4 directories.
-- **Per-camera inline MP4 segments** in `episodes.lance`, with `from_timestamp` / `to_timestamp` bounds per camera and per episode, surfaced as lazy `BlobFile` handles via `take_blobs` so metadata scans never read the bytes.
+- **Per-camera inline MP4 segments** in `episodes.lance`, with `from_timestamp` / `to_timestamp` bounds per camera and per episode, surfaced as lazy `BlobFile` handles via `fetch_blob_files` so metadata scans never read the bytes.
 - **Frame-level observations and actions** in `frames.lance` with stable `episode_index`, `frame_index`, and `index` columns for joining or temporal iteration.
 - **Source MP4 provenance** in `videos.lance` (`relative_path`, `filename`, `file_size_bytes`, `sha256`) alongside the raw bytes, for integrity checks or custom decode pipelines.
 
@@ -128,7 +128,7 @@ print(len(frames), len(episodes), len(videos))
 
 ## Load with Lance
 
-`pylance` is the Python binding for the Lance format and works directly with the format's lower-level APIs. Reach for it when you want to inspect dataset internals — schema, scanner, fragments, the list of pre-built indices — or when you need the blob-level `take_blobs` entry point that streams MP4 bytes lazily from inline storage.
+`pylance` is the Python binding for the Lance format and works directly with the format's lower-level APIs. Reach for it when you want to inspect dataset internals — schema, scanner, fragments, and the list of pre-built indices.
 
 ```python
 import lance
@@ -224,7 +224,9 @@ episodes.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table (offline reward labels, classifier predictions, learned observation embeddings), merge them in by joining on the appropriate key — `index` for frames or `episode_index` for episodes:
+The original columns and the inline video blobs are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table (offline reward labels, classifier predictions, learned observation embeddings), add the new fields and update matching rows by the appropriate key — `index` for frames or `episode_index` for episodes:
 
 ```python
 import pyarrow as pa
@@ -233,14 +235,15 @@ ep_labels = pa.table({
     "episode_index": pa.array([0, 1, 2]),
     "outcome": pa.array(["success", "partial", "success"]),
 })
-episodes.merge(ep_labels, on="episode_index")
+episodes.add_columns([f for f in ep_labels.schema if f.name != "episode_index"])
+episodes.merge_insert("episode_index").when_matched_update_all().execute(ep_labels)
 ```
 
-The original columns and the inline video blobs are untouched, so existing code that does not reference the new columns continues to work unchanged. For column values that require a Python computation (e.g., running a visual encoder over the decoded video frames), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., running a visual encoder over the decoded video frames), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
 
 ## Train
 
-A common pattern for vision-language-action training is to pre-extract decoded frame pixels once into a derived LanceDB table — one row per frame, with the per-frame `action` and `observation_state` already joined in, and one column per camera holding the decoded image — and train against that table with the regular projection-based dataloader. `take_blobs` is the mechanism that makes the extraction step tractable: each episode's per-camera MP4 segment is randomly addressable in `episodes.lance` (the `*_from_timestamp` / `*_to_timestamp` columns give the segment bounds), so the pass can subset bytes on demand and write decoded frames into a fresh table without an external file store. Other workflows project the `*_video_blob` columns from `episodes.lance` directly and decode at the batch boundary, or skip pixels entirely and train a state-only policy on `frames.lance` — the right shape is workload-specific. The actual training loop is the same `Permutation.identity(tbl).select_columns(...)` snippet in every case; only the source table and the column list change.
+A common pattern for vision-language-action training is to pre-extract decoded frame pixels once into a derived LanceDB table — one row per frame, with the per-frame `action` and `observation_state` already joined in, and one column per camera holding the decoded image — and train against that table with the regular projection-based dataloader. `fetch_blob_files` (in `lancedb >= 0.41.0`) is the mechanism that makes the extraction step tractable: each episode's per-camera MP4 segment is randomly addressable in `episodes.lance` (the `*_from_timestamp` / `*_to_timestamp` columns give the segment bounds), so the pass can subset bytes on demand and write decoded frames into a fresh table without an external file store. Other workflows project the `*_video_blob` columns from `episodes.lance` directly and decode at the batch boundary, or skip pixels entirely and train a state-only policy on `frames.lance` — the right shape is workload-specific. The actual training loop is the same `Permutation.identity(tbl).select_columns(...)` snippet in every case; only the source table and the column list change.
 
 For a state-only policy, the frames table is already in the right shape — no pre-extraction needed:
 
@@ -272,7 +275,7 @@ train_ds = Permutation.identity(tbl).select_columns(
 loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=4)
 ```
 
-The inline `_video_blob` storage and `take_blobs` still earn their place outside of the training loop — visualizing an episode in a notebook, sampling for human review, one-off evaluation, and the pre-extraction step itself — but they are not the dataloader.
+The inline `_video_blob` storage and `fetch_blob_files` still earn their place outside of the training loop — visualizing an episode in a notebook, sampling for human review, one-off evaluation, and the pre-extraction step itself — but they are not the dataloader.
 
 ## Versioning
 

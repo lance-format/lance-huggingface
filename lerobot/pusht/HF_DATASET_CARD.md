@@ -22,7 +22,7 @@ A Lance-formatted version of [`lerobot/pusht`](https://huggingface.co/datasets/l
 ## Key features
 
 - **Three-table layout** — `frames`, `episodes`, `videos` — so frame-level training, episode-level trajectory work, and raw video access live side-by-side without scattered parquet shards or sidecar MP4 directories.
-- **Inline MP4 segments** in `episodes.lance` (one blob per camera, with `from_timestamp` / `to_timestamp` bounds) and full source MP4s in `videos.lance`, all surfaced as lazy `BlobFile` handles via `take_blobs` so metadata scans never read the bytes.
+- **Inline MP4 segments** in `episodes.lance` (one blob per camera, with `from_timestamp` / `to_timestamp` bounds) and full source MP4s in `videos.lance`, all surfaced as lazy `BlobFile` handles via `fetch_blob_files` so metadata scans never read the bytes.
 - **Frame-level observations and actions** in `frames.lance` with stable `episode_index`, `frame_index`, and `index` columns for joining or temporal iteration.
 - **Schema-evolution friendly** — add alternate camera streams, language annotations, or model predictions later without rewriting the data.
 
@@ -60,7 +60,7 @@ Use `frames.lance` for low-level training (loss-per-timestep, state-conditioned 
 | `timestamps` | `list<float32>` | Per-frame timestamps |
 | `actions` | `list<list<float32>>` | Per-frame action vectors |
 | `observation_state` | `list<list<float32>>` | Per-frame robot state vectors |
-| `<camera>_video_blob` | `large_binary` (blob-encoded) | Inline MP4 segment for each camera, read lazily via `take_blobs` |
+| `<camera>_video_blob` | `large_binary` (blob-encoded) | Inline MP4 segment for each camera, read lazily via `fetch_blob_files` |
 | `<camera>_from_timestamp` | `float64` | Segment start time |
 | `<camera>_to_timestamp` | `float64` | Segment end time |
 
@@ -117,7 +117,7 @@ print(len(frames), len(episodes), len(videos))
 
 ## Load with Lance
 
-`pylance` is the Python binding for the Lance format and works directly with the format's lower-level APIs. Reach for it when you want to inspect dataset internals — schema, scanner, fragments, the list of pre-built indices — or when you need the blob-level `take_blobs` entry point that streams MP4 bytes lazily from inline storage.
+`pylance` is the Python binding for the Lance format and works directly with the format's lower-level APIs. Reach for it when you want to inspect dataset internals — schema, scanner, fragments, and the list of pre-built indices.
 
 ```python
 import lance
@@ -210,7 +210,9 @@ frames.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table (offline reward labels, classifier predictions, learned observation embeddings), merge them in by joining on the appropriate key — `index` for frames or `episode_index` for episodes:
+The original columns and the inline video blobs are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table (offline reward labels, classifier predictions, learned observation embeddings), add the new fields and update matching rows by the appropriate key — `index` for frames or `episode_index` for episodes:
 
 ```python
 import pyarrow as pa
@@ -219,14 +221,15 @@ rewards = pa.table({
     "index": pa.array([0, 1, 2]),
     "reward_to_go": pa.array([1.4, 1.3, 1.2]),
 })
-frames.merge(rewards, on="index")
+frames.add_columns([f for f in rewards.schema if f.name != "index"])
+frames.merge_insert("index").when_matched_update_all().execute(rewards)
 ```
 
-The original columns and the inline video blobs are untouched, so existing code that does not reference the new columns continues to work unchanged. For column values that require a Python computation (e.g., running a visual encoder over the decoded video frames), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., running a visual encoder over the decoded video frames), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
 
 ## Train
 
-A common pattern for vision-conditioned policy training is to pre-extract decoded frame pixels once into a derived LanceDB table — one row per frame, with the per-frame `action` and `observation_state` already joined in — and train against that table with the regular projection-based dataloader. `take_blobs` is the mechanism that makes the extraction step tractable: each episode's MP4 segment is randomly addressable in `episodes.lance` (the `from_timestamp` / `to_timestamp` columns give the segment bounds), so the pass can subset bytes on demand and write decoded frames into a fresh table without an external file store. Other workflows project the `_video_blob` columns from `episodes.lance` directly and decode at the batch boundary, or skip pixels entirely and train a state-only policy on `frames.lance` — the right shape is workload-specific. The actual training loop is the same `Permutation.identity(tbl).select_columns(...)` snippet in every case; only the source table and the column list change.
+A common pattern for vision-conditioned policy training is to pre-extract decoded frame pixels once into a derived LanceDB table — one row per frame, with the per-frame `action` and `observation_state` already joined in — and train against that table with the regular projection-based dataloader. `fetch_blob_files` (in `lancedb >= 0.41.0`) is the mechanism that makes the extraction step tractable: each episode's MP4 segment is randomly addressable in `episodes.lance` (the `from_timestamp` / `to_timestamp` columns give the segment bounds), so the pass can subset bytes on demand and write decoded frames into a fresh table without an external file store. Other workflows project the `_video_blob` columns from `episodes.lance` directly and decode at the batch boundary, or skip pixels entirely and train a state-only policy on `frames.lance` — the right shape is workload-specific. The actual training loop is the same `Permutation.identity(tbl).select_columns(...)` snippet in every case; only the source table and the column list change.
 
 For a state-only policy, the frames table is already in the right shape — no pre-extraction needed:
 
@@ -256,7 +259,7 @@ train_ds = Permutation.identity(tbl).select_columns(["image", "observation_state
 loader = DataLoader(train_ds, batch_size=64, shuffle=True, num_workers=4)
 ```
 
-The inline `_video_blob` storage and `take_blobs` still earn their place outside of the training loop — visualizing an episode in a notebook, sampling for human review, one-off evaluation against a held-out task, and the pre-extraction step itself — but they are not the dataloader.
+The inline `_video_blob` storage and `fetch_blob_files` still earn their place outside of the training loop — visualizing an episode in a notebook, sampling for human review, one-off evaluation against a held-out task, and the pre-extraction step itself — but they are not the dataloader.
 
 ## Versioning
 

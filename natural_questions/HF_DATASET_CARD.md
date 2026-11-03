@@ -204,7 +204,9 @@ tbl.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table (offline retriever scores, generated-answer judgments, alternate embeddings from a stronger model), merge them in by joining on `id`:
+The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table (offline retriever scores, generated-answer judgments, alternate embeddings from a stronger model), add the new fields and update matching rows by `id`:
 
 ```python
 import pyarrow as pa
@@ -213,10 +215,11 @@ retriever_scores = pa.table({
     "id": pa.array(["797803103333068850", "5225754983651766092"]),
     "bm25_top1_score": pa.array([14.2, 8.7]),
 })
-tbl.merge(retriever_scores, on="id")
+tbl.add_columns([f for f in retriever_scores.schema if f.name != "id"])
+tbl.merge_insert("id").when_matched_update_all().execute(retriever_scores)
 ```
 
-The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged. New columns become visible to every reader as soon as the operation commits. For column values that require a Python computation (e.g., extracting the long-answer paragraph from `document_html`), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., extracting the long-answer paragraph from `document_html`), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
 
 ## Train
 
