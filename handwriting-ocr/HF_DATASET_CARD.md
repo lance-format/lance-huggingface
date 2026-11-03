@@ -185,16 +185,18 @@ import pyarrow as pa
 db = lancedb.connect("./data")
 tbl = db.open_table("train")
 
+# SQL-derived columns append a column file without rewriting existing columns or indices
 tbl.add_columns({"is_paracetamol": "generic_name = 'Paracetamol'"})
 
 review_labels = pa.table({
     "id": ["train_00000"],
     "review_status": ["reviewed"],
 })
-tbl.merge(review_labels, on="id")
+tbl.add_columns([pa.field("review_status", pa.string())])
+tbl.merge_insert("id").when_matched_update_all().execute(review_labels)
 ```
 
-The source columns and pre-built indices remain intact. New labels become available to queries as soon as the write commits.
+Matched rows receive the new labels while unmatched rows stay `null`, and each mutation becomes visible to queries as soon as its new table version commits.
 
 ## Train
 

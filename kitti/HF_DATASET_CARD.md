@@ -211,7 +211,9 @@ tbl.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table — detector predictions on the same frames, LIDAR-derived per-frame features, or human re-annotation — merge them in by joining on `id`:
+The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table — detector predictions on the same frames, LIDAR-derived per-frame features, or human re-annotation — add the new fields and update matching rows by `id`:
 
 ```python
 import pyarrow as pa
@@ -220,10 +222,11 @@ predictions = pa.table({
     "id": pa.array([0, 1, 2], type=pa.int64()),
     "pred_num_cars": pa.array([3, 5, 0], type=pa.int32()),
 })
-tbl.merge(predictions, on="id")
+tbl.add_columns([f for f in predictions.schema if f.name != "id"])
+tbl.merge_insert("id").when_matched_update_all().execute(predictions)
 ```
 
-The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged. New columns become visible to every reader as soon as the operation commits. For column values that require a Python computation (running a fresh detector over the JPEG bytes, deriving alternative embeddings), Lance also provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (running a fresh detector over the JPEG bytes, deriving alternative embeddings), Lance also provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
 
 ## Train
 

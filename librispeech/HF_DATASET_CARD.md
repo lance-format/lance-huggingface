@@ -201,7 +201,9 @@ tbl.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table (alternate transcripts, speaker embeddings, model predictions), merge them in by joining on `id`:
+The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table (alternate transcripts, speaker embeddings, model predictions), add the new fields and update matching rows by `id`:
 
 ```python
 import pyarrow as pa
@@ -210,14 +212,15 @@ predictions = pa.table({
     "id": pa.array(["1272-128104-0000", "1272-128104-0001"]),
     "wer": pa.array([0.04, 0.12]),
 })
-tbl.merge(predictions, on="id")
+tbl.add_columns([f for f in predictions.schema if f.name != "id"])
+tbl.merge_insert("id").when_matched_update_all().execute(predictions)
 ```
 
-The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged. For column values that require a Python computation (e.g., running a speaker embedding model over the FLAC bytes), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., running a speaker embedding model over the FLAC bytes), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
 
 ## Train
 
-A common pattern for audio training is to pre-extract decoded features once into a derived LanceDB table — one row per training-ready window of log-mel frames or raw PCM samples — and train against that table with the regular projection-based dataloader. `take_blobs` is the mechanism that makes the extraction step tractable: each utterance's FLAC bytes are randomly addressable, so the pass can subset audio on demand and write decoded windows into a fresh table without an external file store. Other workflows project `audio` directly through `select_columns(...)` and decode at the batch boundary, or skip audio entirely and train on the cached transcript embeddings — the right shape is workload-specific. The actual training loop is the same `Permutation.identity(tbl).select_columns(...)` snippet in every case; only the source table and the column list change.
+A common pattern for audio training is to pre-extract decoded features once into a derived LanceDB table — one row per training-ready window of log-mel frames or raw PCM samples — and train against that table with the regular projection-based dataloader. `fetch_blob_files` (in `lancedb >= 0.41.0`) is the mechanism that makes the extraction step tractable: each utterance's FLAC bytes are randomly addressable, so the pass can subset audio on demand and write decoded windows into a fresh table without an external file store. Other workflows project `audio` directly through `select_columns(...)` and decode at the batch boundary, or skip audio entirely and train on the cached transcript embeddings — the right shape is workload-specific. The actual training loop is the same `Permutation.identity(tbl).select_columns(...)` snippet in every case; only the source table and the column list change.
 
 Against a pre-extracted features table:
 
@@ -247,7 +250,7 @@ train_ds = Permutation.identity(src_tbl).select_columns(["text_emb", "speaker_id
 loader = DataLoader(train_ds, batch_size=256, shuffle=True, num_workers=4)
 ```
 
-The inline `audio` storage and `take_blobs` still earn their place around the training process — listening back to an utterance in a notebook, sampling for human review, one-off evaluation against a held-out set, and the pre-extraction pass itself. Each of those reads a small, explicit set of blobs once. What the Train section above keeps off the per-batch hot path is exactly that raw-audio decode: paying it every step is what the pre-extracted features are designed to avoid.
+The inline `audio` storage and `fetch_blob_files` still earn their place around the training process — listening back to an utterance in a notebook, sampling for human review, one-off evaluation against a held-out set, and the pre-extraction pass itself. Each of those reads a small, explicit set of blobs once. What the Train section above keeps off the per-batch hot path is exactly that raw-audio decode: paying it every step is what the pre-extracted features are designed to avoid.
 
 ## Versioning
 

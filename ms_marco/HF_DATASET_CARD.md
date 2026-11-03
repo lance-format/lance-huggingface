@@ -202,7 +202,9 @@ tbl.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table (cross-encoder reranker scores, generated-answer judgments, alternate embeddings from a stronger model), merge them in by joining on `query_id`:
+The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table (cross-encoder reranker scores, generated-answer judgments, alternate embeddings from a stronger model), add the new fields and update matching rows by `query_id`:
 
 ```python
 import pyarrow as pa
@@ -211,10 +213,11 @@ reranker_scores = pa.table({
     "query_id": pa.array([1185869, 9083, 524332], type=pa.int64()),
     "reranker_top1_score": pa.array([0.91, 0.47, 0.83]),
 })
-tbl.merge(reranker_scores, on="query_id")
+tbl.add_columns([f for f in reranker_scores.schema if f.name != "query_id"])
+tbl.merge_insert("query_id").when_matched_update_all().execute(reranker_scores)
 ```
 
-The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged. New columns become visible to every reader as soon as the operation commits. For column values that require a Python computation (e.g., running a different encoder over the query text), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., running a different encoder over the query text), Lance provides a batch-UDF API — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/).
 
 ## Train
 

@@ -174,7 +174,9 @@ tbl.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table — per-class hypernyms from WordNet, ImageNet-A / ImageNet-R membership flags, model-prediction logs from an external eval run — merge them in by joining on `label_name`:
+The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table — per-class hypernyms from WordNet, ImageNet-A / ImageNet-R membership flags, model-prediction logs from an external eval run — add the new fields and update matching rows by `label_name`:
 
 ```python
 import pyarrow as pa
@@ -183,10 +185,11 @@ hypernyms = pa.table({
     "label_name": pa.array(["golden_retriever", "tabby", "espresso"]),
     "hypernym": pa.array(["dog", "cat", "beverage"]),
 })
-tbl.merge(hypernyms, on="label_name")
+tbl.add_columns([f for f in hypernyms.schema if f.name != "label_name"])
+tbl.merge_insert("label_name").when_matched_update_all().execute(hypernyms)
 ```
 
-The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged. New columns become visible to every reader as soon as the operation commits. For column values that require a Python computation (e.g., running an alternative vision backbone over the image bytes), Lance provides a batch-UDF API in the underlying library — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/) for that pattern.
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., running an alternative vision backbone over the image bytes), Lance provides a batch-UDF API in the underlying library — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/) for that pattern.
 
 ## Train
 

@@ -182,7 +182,9 @@ tbl.add_columns({
 })
 ```
 
-If the values you want to attach already live in another table (a coarse climate label per class, an external aesthetic score, model predictions from a separate eval), merge them in by joining on `label_name`:
+The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged.
+
+If the values you want to attach already live in another table (a coarse climate label per class, an external aesthetic score, model predictions from a separate eval), add the new fields and update matching rows by `label_name`:
 
 ```python
 import pyarrow as pa
@@ -191,10 +193,11 @@ climate = pa.table({
     "label_name": pa.array(["Forest", "Pasture", "SeaLake", "River"]),
     "climate_zone": pa.array(["temperate", "temperate", "marine", "freshwater"]),
 })
-tbl.merge(climate, on="label_name")
+tbl.add_columns([f for f in climate.schema if f.name != "label_name"])
+tbl.merge_insert("label_name").when_matched_update_all().execute(climate)
 ```
 
-The original columns and indices are untouched, so existing code that does not reference the new columns continues to work unchanged. New columns become visible to every reader as soon as the operation commits. For column values that require a Python computation (e.g., running an alternative remote-sensing model over the tile bytes), Lance provides a batch-UDF API in the underlying library — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/) for that pattern.
+Matched rows receive the new values while unmatched rows stay `null`, and the update commits as a new table version. For column values that require a Python computation (e.g., running an alternative remote-sensing model over the tile bytes), Lance provides a batch-UDF API in the underlying library — see the [Lance data evolution docs](https://lance.org/guide/data_evolution/) for that pattern.
 
 ## Train
 
